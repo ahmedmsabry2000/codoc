@@ -65,6 +65,7 @@ class InitTests(unittest.TestCase):
             self.assertIn("!.codoc/scripts/", ignore)
             self.assertIn("!.codoc/scripts/**", ignore)
             self.assertIn("site/", ignore)
+            self.assertIn("mkdocs.yml", ignore)
             out, err, code = _run_in(repo, ["status"])
         self.assertIn(code, (0, None))
         self.assertEqual(err, "")

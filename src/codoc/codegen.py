@@ -1,4 +1,4 @@
-"""Write engine and Vale files under .codoc/generated/ from ProjectConfig."""
+"""Write engine and Vale files from ProjectConfig."""
 
 import os
 import tempfile
@@ -9,7 +9,9 @@ from codoc.config import ConfigError, ProjectConfig, load_project_config
 from codoc.discover import DiscoverError, git_root
 
 _GENERATED_DIR = Path(".codoc") / "generated"
-_ENGINE_FILE = _GENERATED_DIR / "mkdocs.yml"
+# Zensical treats the config file's directory as the project root and rejects
+# docs_dir/site_dir that use '..', so the engine file is a generated root shim.
+_ENGINE_FILE = Path("mkdocs.yml")
 _VALE_INI = _GENERATED_DIR / ".vale.ini"
 _VOCAB_DIR = _GENERATED_DIR / "styles" / "Vocab" / "Codoc"
 _ACCEPT = _VOCAB_DIR / "accept.txt"
@@ -50,7 +52,7 @@ def ensure_generated(start: Path | None = None) -> GeneratedPaths:
 
 
 def write_generated(root: Path, config: ProjectConfig) -> GeneratedPaths:
-    """Materialize engine (and Vale when enabled) under root/.codoc/generated/."""
+    """Materialize engine mkdocs.yml at root and Vale under .codoc/generated/."""
     name = config.engine.name.lower()
     if name not in {"zensical", "mkdocs"}:
         raise CodegenError(f"unsupported engine {config.engine.name!r}")
@@ -86,14 +88,11 @@ def write_generated(root: Path, config: ProjectConfig) -> GeneratedPaths:
 
 
 def _render_engine(config: ProjectConfig) -> str:
-    # Paths are relative to .codoc/generated/ so zensical/mkdocs -f works from repo root.
-    docs = Path("..") / ".." / config.engine.docs_dir
-    site = Path("..") / ".." / config.engine.site_dir
     return (
         f"{_HEADER}"
         f"site_name: Documentation\n"
-        f"docs_dir: {docs.as_posix()}\n"
-        f"site_dir: {site.as_posix()}\n"
+        f"docs_dir: {Path(config.engine.docs_dir).as_posix()}\n"
+        f"site_dir: {Path(config.engine.site_dir).as_posix()}\n"
     )
 
 

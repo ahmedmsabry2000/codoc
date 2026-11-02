@@ -8,6 +8,7 @@ from codoc.config import ConfigError
 from codoc.discover import DiscoverError, discover, git_root
 from codoc.init_cmd import InitError, run_init
 from codoc.registry import build_page_registry
+from codoc.site_cmd import SiteError, run_build, run_serve
 from codoc.spec import SpecDocument, SpecError, load_spec
 
 
@@ -57,7 +58,13 @@ def main(argv: list[str] | None = None) -> None:
     if behavior == "status":
         _run_status()
         return
-    if behavior in {"build", "serve", "lint"}:
+    if behavior == "build":
+        _run_build()
+        return
+    if behavior == "serve":
+        _run_serve()
+        return
+    if behavior == "lint":
         _run_codegen(behavior)
         return
     _not_implemented(behavior)
@@ -92,6 +99,27 @@ def _run_init(*, force: bool) -> None:
         print(path.as_posix())
 
 
+def _run_build() -> None:
+    try:
+        result = run_build(Path.cwd())
+    except SiteError as err:
+        print(f"codoc build: {err}", file=sys.stderr)
+        raise SystemExit(1) from err
+    print(result.site_dir.as_posix())
+
+
+def _run_serve() -> None:
+    try:
+        result = run_serve(Path.cwd())
+    except SiteError as err:
+        print(f"codoc serve: {err}", file=sys.stderr)
+        raise SystemExit(1) from err
+    print(f"pid\t{result.pid}")
+    print(f"url\thttp://{result.dev_addr}/")
+    print(f"log\t{result.log_file.as_posix()}")
+    print(f"pidfile\t{result.pid_file.as_posix()}")
+
+
 def _run_codegen(behavior: str) -> None:
     try:
         result = ensure_generated(Path.cwd())
@@ -100,7 +128,7 @@ def _run_codegen(behavior: str) -> None:
         raise SystemExit(1) from err
     for path in result.written:
         print(path.as_posix())
-    print(f"codoc {behavior}: site tool not invoked", file=sys.stderr)
+    print(f"codoc {behavior}: vale not invoked", file=sys.stderr)
     raise SystemExit(0)
 
 
