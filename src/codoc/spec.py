@@ -1,4 +1,4 @@
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -149,24 +149,6 @@ def load_spec(path: Path) -> SpecDocument:
         docs=tuple(page for page, _where in top),
         coverage=coverage,
     )
-
-
-def check_unique_page_ids(items: Sequence[tuple[Path, SpecDocument]]) -> None:
-    """Raise SpecError when one page id is declared in two spec files.
-
-    items are pairs of spec path and document, in discover order. The
-    exception path is the later file. detail names the earlier file.
-    """
-    seen: dict[str, Path] = {}
-    for path, doc in items:
-        for page in doc.pages():
-            earlier = seen.get(page.id)
-            if earlier is not None:
-                raise SpecError(
-                    path,
-                    f"duplicate page id {page.id!r} also in {earlier}",
-                )
-            seen[page.id] = path
 
 
 def _reject_unknown(mapping: dict, allowed: frozenset[str], where: str, fail) -> None:

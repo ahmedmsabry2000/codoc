@@ -12,7 +12,6 @@ from codoc.spec import (
     Placeholder,
     SpecDocument,
     SpecError,
-    check_unique_page_ids,
     load_spec,
 )
 
@@ -340,32 +339,6 @@ class SpecTests(unittest.TestCase):
             loaded = load_spec(path)
         self.assertEqual(loaded.page_count, 1)
         self.assertEqual(loaded.coverage.source[0].id, "cli-core")
-
-    def test_duplicate_page_id_across_specs(self) -> None:
-        text = "\n".join((
-            "docs:",
-            "  - id: overview",
-            "    type: manual",
-            "    path: docs/overview.md",
-            "",
-        ))
-        with tempfile.TemporaryDirectory() as raw:
-            root = Path(raw)
-            earlier = root / "src" / "my_project" / "codoc.spec.yaml"
-            later = root / "src" / "my_project" / "cli" / "codoc.spec.yaml"
-            earlier.parent.mkdir(parents=True)
-            later.parent.mkdir(parents=True)
-            earlier.write_text(text)
-            later.write_text(text)
-            first = load_spec(earlier)
-            second = load_spec(later)
-            with self.assertRaises(SpecError) as caught:
-                check_unique_page_ids(((earlier, first), (later, second)))
-        self.assertEqual(caught.exception.path, later)
-        self.assertEqual(
-            caught.exception.detail,
-            f"duplicate page id 'overview' also in {earlier}",
-        )
 
     def test_repeated_key_is_rejected(self) -> None:
         text = "docs:\n  - id: overview\n    id: other\n    type: manual\n    path: docs/a.md\n"

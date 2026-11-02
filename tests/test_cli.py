@@ -98,6 +98,7 @@ class CliTests(unittest.TestCase):
                 "src/my_project/api/codoc.spec.yaml\tsrc/my_project/api\t0",
                 "src/my_project/cli/codoc.spec.yaml\tsrc/my_project/cli\t0",
                 "src/my_project/codoc.spec.yaml\tsrc/my_project\t0",
+                "registry_pages\t0",
                 "",
             )),
         )
@@ -108,7 +109,7 @@ class CliTests(unittest.TestCase):
             stdout, stderr, code, _cwd = _run_status_in(repo)
         self.assertIsNone(code)
         self.assertEqual(stderr, "")
-        self.assertEqual(stdout, "spec_path\tscope_dir\tpages\n")
+        self.assertEqual(stdout, "spec_path\tscope_dir\tpages\nregistry_pages\t0\n")
 
     def test_status_outside_a_repo_exits_1(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
@@ -144,9 +145,16 @@ class CliTests(unittest.TestCase):
             "          path: docs/reference/cli/index.md",
             "",
         ))
+        root_spec = "\n".join((
+            "docs:",
+            "  - id: readme",
+            "    type: manual",
+            "    path: docs/readme.md",
+            "",
+        ))
         with _git_repo() as repo:
             _write(repo / "codoc.yaml")
-            _write(repo / "codoc.spec.yaml")
+            _write(repo / "codoc.spec.yaml", root_spec)
             _write(repo / "src" / "my_project" / "cli" / "codoc.spec.yaml", spec)
             stdout, stderr, code, _cwd = _run_status_in(repo)
         self.assertIsNone(code)
@@ -155,8 +163,9 @@ class CliTests(unittest.TestCase):
             stdout,
             "\n".join((
                 "spec_path\tscope_dir\tpages",
-                "codoc.spec.yaml\t.\t0",
+                "codoc.spec.yaml\t.\t1",
                 "src/my_project/cli/codoc.spec.yaml\tsrc/my_project/cli\t3",
+                "registry_pages\t4",
                 "",
             )),
         )

@@ -13,6 +13,6 @@ This repository is the Codoc Python package. The installable command is `codoc`.
 
 `codoc` with no arguments, or with `--help`, prints help and exits 0.
 
-`codoc status` prints a tab-separated table with the columns `spec_path`, `scope_dir`, and `pages`. The pages column is the number of pages in that spec. An empty spec prints `0`. The command exits 0 when the git root contains a readable `codoc.yaml` and every spec loads. An empty spec list still prints the header. The command prints `codoc status: ...` to stderr and exits 1 when the directory is not a git repository, when `codoc.yaml` is missing, when `git` is not on `PATH`, or when a project or spec file is invalid.
+`codoc status` prints a tab-separated table with the columns `spec_path`, `scope_dir`, and `pages`. The pages column is the number of pages in that spec. An empty spec prints `0`. After the spec rows, status prints `registry_pages` and the number of page ids across every spec. An empty spec list still prints the header and `registry_pages` with `0`. The command exits 0 when the git root contains a readable `codoc.yaml` and every spec loads. The command prints `codoc status: ...` to stderr and exits 1 when the directory is not a git repository, when `codoc.yaml` is missing, when `git` is not on `PATH`, when a project or spec file is invalid, or when the same page id appears in two specs.
 
 Every other registered command prints `codoc <name>: not implemented` to stderr and exits 2. `drift` is an alias of `validate`.

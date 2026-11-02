@@ -5,7 +5,8 @@ from pathlib import Path
 
 from codoc.config import ConfigError
 from codoc.discover import DiscoverError, discover, git_root
-from codoc.spec import SpecDocument, SpecError, check_unique_page_ids, load_spec
+from codoc.registry import build_page_registry
+from codoc.spec import SpecDocument, SpecError, load_spec
 
 
 @dataclass(frozen=True)
@@ -74,7 +75,7 @@ def _run_status() -> None:
         for unit in units:
             spec_path = root / unit.spec_path
             loaded.append((spec_path, load_spec(spec_path)))
-        check_unique_page_ids(loaded)
+        registry = build_page_registry(loaded)
     except (DiscoverError, ConfigError, SpecError) as err:
         print(f"codoc status: {err}", file=sys.stderr)
         raise SystemExit(1) from err
@@ -82,6 +83,7 @@ def _run_status() -> None:
     for unit, (_, doc) in zip(units, loaded, strict=True):
         line = f"{unit.spec_path.as_posix()}\t{unit.scope_dir.as_posix()}\t{doc.page_count}"
         print(line)
+    print(f"registry_pages\t{len(registry)}")
 
 
 def _not_implemented(behavior: str) -> None:
