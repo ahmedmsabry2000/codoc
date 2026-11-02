@@ -3,6 +3,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from codoc.codegen import CodegenError, ensure_generated
 from codoc.config import ConfigError
 from codoc.discover import DiscoverError, discover, git_root
 from codoc.init_cmd import InitError, run_init
@@ -56,6 +57,9 @@ def main(argv: list[str] | None = None) -> None:
     if behavior == "status":
         _run_status()
         return
+    if behavior in {"build", "serve", "lint"}:
+        _run_codegen(behavior)
+        return
     _not_implemented(behavior)
 
 
@@ -86,6 +90,18 @@ def _run_init(*, force: bool) -> None:
         raise SystemExit(1) from err
     for path in result.written:
         print(path.as_posix())
+
+
+def _run_codegen(behavior: str) -> None:
+    try:
+        result = ensure_generated(Path.cwd())
+    except CodegenError as err:
+        print(f"codoc {behavior}: {err}", file=sys.stderr)
+        raise SystemExit(1) from err
+    for path in result.written:
+        print(path.as_posix())
+    print(f"codoc {behavior}: site tool not invoked", file=sys.stderr)
+    raise SystemExit(0)
 
 
 def _run_status() -> None:
