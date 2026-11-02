@@ -1,10 +1,11 @@
 import os
 import subprocess
-import tempfile
 import unittest
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+
+from tests.tmpdir import temporary_directory
 from unittest.mock import patch
 
 from codoc.config import ConfigError
@@ -25,8 +26,7 @@ def _write(path: Path, text: str = "") -> None:
 
 @contextmanager
 def _git_repo() -> Iterator[Path]:
-    with tempfile.TemporaryDirectory() as raw:
-        root = Path(raw)
+    with temporary_directory() as root:
         subprocess.run(
             ["git", "init", "-q"],
             cwd=root,
@@ -47,14 +47,14 @@ def _product_tree(repo: Path) -> None:
 
 class DiscoverTests(unittest.TestCase):
     def test_missing_git_repo(self) -> None:
-        with tempfile.TemporaryDirectory() as raw:
+        with temporary_directory() as raw:
             start = Path(raw)
             with self.assertRaises(DiscoverError) as caught:
                 discover(start)
         self.assertEqual(str(caught.exception), f"not a git repository at {start}")
 
     def test_git_not_on_path(self) -> None:
-        with tempfile.TemporaryDirectory() as raw:
+        with temporary_directory() as raw:
             start = Path(raw)
             with patch.dict(os.environ, {"PATH": str(start)}):
                 with self.assertRaises(DiscoverError) as caught:

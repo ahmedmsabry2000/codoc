@@ -2,11 +2,12 @@ import io
 import os
 import shutil
 import subprocess
-import tempfile
 import unittest
 from collections.abc import Iterator
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
+
+from tests.tmpdir import temporary_directory
 from unittest.mock import MagicMock, patch
 
 import codoc.cli as cli
@@ -16,8 +17,7 @@ from codoc.site_cmd import SiteError, run_build, run_serve, stop_serve
 
 @contextmanager
 def _git_repo() -> Iterator[Path]:
-    with tempfile.TemporaryDirectory() as raw:
-        root = Path(raw)
+    with temporary_directory() as root:
         subprocess.run(
             ["git", "init", "-q"],
             cwd=root,

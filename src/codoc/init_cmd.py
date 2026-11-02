@@ -88,7 +88,8 @@ def run_init(start: Path | None = None, *, force: bool = False) -> InitResult:
     _atomic_write(project, _PROJECT_TEMPLATE)
     written.append(Path(_PROJECT_FILE))
 
-    pkg.mkdir(parents=True, exist_ok=True)
+    # pkg is repo-relative; always mkdir under root (not cwd).
+    (root / pkg).mkdir(parents=True, exist_ok=True)
     _atomic_write(spec_abs, _SPEC_TEMPLATE)
     written.append(spec_rel)
 

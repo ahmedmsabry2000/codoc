@@ -1,8 +1,9 @@
-import tempfile
 import unittest
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+
+from tests.tmpdir import temporary_directory
 
 from codoc.config import (
     ConfigError,
@@ -17,7 +18,7 @@ from codoc.config import (
 
 @contextmanager
 def _file(text: str) -> Iterator[Path]:
-    with tempfile.TemporaryDirectory() as raw:
+    with temporary_directory() as raw:
         path = Path(raw) / "codoc.yaml"
         path.write_text(text)
         yield path
@@ -163,7 +164,7 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(str(caught.exception), f"{path}: document must be a mapping")
 
     def test_invalid_utf8(self) -> None:
-        with tempfile.TemporaryDirectory() as raw:
+        with temporary_directory() as raw:
             path = Path(raw) / "codoc.yaml"
             path.write_bytes(b"\xff")
             with self.assertRaises(ConfigError) as caught:

@@ -1,11 +1,12 @@
 import io
 import os
 import subprocess
-import tempfile
 import unittest
 from collections.abc import Iterator
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
+
+from tests.tmpdir import temporary_directory
 
 import codoc.cli as cli
 from codoc.config import load_project_config
@@ -16,8 +17,7 @@ from codoc.spec import load_spec
 
 @contextmanager
 def _git_repo(name: str = "demo") -> Iterator[Path]:
-    with tempfile.TemporaryDirectory() as raw:
-        parent = Path(raw)
+    with temporary_directory() as parent:
         root = parent / name
         root.mkdir()
         subprocess.run(
@@ -118,13 +118,22 @@ class InitTests(unittest.TestCase):
             self.assertTrue((repo / "src" / "cool_app" / "codoc.spec.yaml").is_file())
 
     def test_not_a_git_repo(self) -> None:
-        with tempfile.TemporaryDirectory() as raw:
-            start = Path(raw)
+        with temporary_directory() as start:
             with self.assertRaises(InitError) as caught:
                 run_init(start)
-            self.assertIn("not a git repository", str(caught.exception))
             self.assertFalse((start / ".git").exists())
             self.assertFalse((start / "codoc.yaml").exists())
+        self.assertIn("not a git repository", str(caught.exception))
+
+    def test_init_does_not_mkdir_under_cwd(self) -> None:
+        # Regression: pkg.mkdir used to be cwd-relative and leaked empty dirs into src/.
+        repo_src = Path(__file__).resolve().parents[1] / "src"
+        before = {path.name for path in repo_src.iterdir()}
+        with _git_repo("leak-probe") as repo:
+            run_init(repo)
+            self.assertTrue((repo / "src" / "leak_probe" / "codoc.spec.yaml").is_file())
+        after = {path.name for path in repo_src.iterdir()}
+        self.assertEqual(after, before)
 
     def test_gitignore_tracks_scripts_gitkeep(self) -> None:
         with _git_repo() as repo:

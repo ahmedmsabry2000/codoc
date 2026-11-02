@@ -1,6 +1,7 @@
-import tempfile
 import unittest
 from pathlib import Path
+
+from tests.tmpdir import temporary_directory
 
 from codoc.registry import RegistryEntry, build_page_registry
 from codoc.spec import Coverage, CoverageBlock, Page, SpecDocument, SpecError, load_spec
@@ -63,8 +64,7 @@ class RegistryTests(unittest.TestCase):
             "    path: docs/overview.md",
             "",
         ))
-        with tempfile.TemporaryDirectory() as raw:
-            root = Path(raw)
+        with temporary_directory() as root:
             earlier = root / "src" / "my_project" / "codoc.spec.yaml"
             later = root / "src" / "my_project" / "cli" / "codoc.spec.yaml"
             earlier.parent.mkdir(parents=True)

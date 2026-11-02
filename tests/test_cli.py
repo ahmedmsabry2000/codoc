@@ -1,11 +1,12 @@
 import io
 import os
 import subprocess
-import tempfile
 import unittest
 from collections.abc import Iterator
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
+
+from tests.tmpdir import temporary_directory
 
 import codoc.cli as cli
 from codoc.discover import git_root
@@ -18,8 +19,7 @@ def _write(path: Path, text: str = "") -> None:
 
 @contextmanager
 def _git_repo() -> Iterator[Path]:
-    with tempfile.TemporaryDirectory() as raw:
-        root = Path(raw)
+    with temporary_directory() as root:
         subprocess.run(
             ["git", "init", "-q"],
             cwd=root,
@@ -112,7 +112,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(stdout, "spec_path\tscope_dir\tpages\nregistry_pages\t0\n")
 
     def test_status_outside_a_repo_exits_1(self) -> None:
-        with tempfile.TemporaryDirectory() as raw:
+        with temporary_directory() as raw:
             stdout, stderr, code, cwd = _run_status_in(Path(raw))
         self.assertEqual(code, 1)
         self.assertEqual(stdout, "")

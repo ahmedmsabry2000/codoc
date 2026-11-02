@@ -1,9 +1,10 @@
 import subprocess
-import tempfile
 import unittest
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+
+from tests.tmpdir import temporary_directory
 
 from codoc.codegen import CodegenError, ensure_generated, write_generated
 from codoc.config import load_project_config
@@ -11,8 +12,7 @@ from codoc.config import load_project_config
 
 @contextmanager
 def _git_repo() -> Iterator[Path]:
-    with tempfile.TemporaryDirectory() as raw:
-        root = Path(raw)
+    with temporary_directory() as root:
         subprocess.run(
             ["git", "init", "-q"],
             cwd=root,

@@ -1,8 +1,9 @@
-import tempfile
 import unittest
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+
+from tests.tmpdir import temporary_directory
 
 from codoc.spec import (
     Coverage,
@@ -18,7 +19,7 @@ from codoc.spec import (
 
 @contextmanager
 def _file(text: str, name: str = "codoc.spec.yaml") -> Iterator[Path]:
-    with tempfile.TemporaryDirectory() as raw:
+    with temporary_directory() as raw:
         path = Path(raw) / name
         path.write_text(text)
         yield path
