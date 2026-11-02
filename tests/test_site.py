@@ -6,13 +6,12 @@ import unittest
 from collections.abc import Iterator
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
-
-from tests.tmpdir import temporary_directory
 from unittest.mock import MagicMock, patch
 
 import codoc.cli as cli
 from codoc.commands.init import run_init
 from codoc.commands.site import SiteError, run_build, run_serve, stop_serve
+from tests.tmpdir import temporary_directory
 
 
 @contextmanager
@@ -95,9 +94,11 @@ class SiteCmdTests(unittest.TestCase):
     def test_build_missing_binary(self) -> None:
         with _git_repo() as repo:
             run_init(repo)
-            with patch("codoc.commands.site.shutil.which", return_value=None):
-                with self.assertRaises(SiteError) as caught:
-                    run_build(repo)
+            with (
+                patch("codoc.commands.site.shutil.which", return_value=None),
+                self.assertRaises(SiteError) as caught,
+            ):
+                run_build(repo)
             self.assertIn("zensical not found on PATH", str(caught.exception))
 
     def test_build_uses_mkdocs_when_configured(self) -> None:

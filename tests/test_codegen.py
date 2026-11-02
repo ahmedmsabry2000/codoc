@@ -4,10 +4,9 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-from tests.tmpdir import temporary_directory
-
-from codoc.engine.codegen import CodegenError, ensure_generated, write_generated
 from codoc.config import load_project_config
+from codoc.engine.codegen import CodegenError, ensure_generated, write_generated
+from tests.tmpdir import temporary_directory
 
 
 @contextmanager
@@ -55,7 +54,11 @@ class CodegenTests(unittest.TestCase):
             self.assertIn("StylesPath = styles", vale)
             accept = (repo / result.vocab_accept).read_text(encoding="utf-8")
             self.assertEqual(accept, "Codoc\nZensical\n")
-            self.assertTrue((repo / ".codoc" / "generated" / "styles" / "Vocab" / "Codoc" / "reject.txt").is_file())
+            self.assertTrue(
+                (
+                    repo / ".codoc" / "generated" / "styles" / "Vocab" / "Codoc" / "reject.txt"
+                ).is_file()
+            )
 
     def test_vale_disabled_skips_vale_files(self) -> None:
         with _git_repo() as repo:
@@ -81,9 +84,8 @@ class CodegenTests(unittest.TestCase):
             self.assertIn("unsupported engine", str(caught.exception))
 
     def test_missing_codoc_yaml(self) -> None:
-        with _git_repo() as repo:
-            with self.assertRaises(CodegenError):
-                ensure_generated(repo)
+        with _git_repo() as repo, self.assertRaises(CodegenError):
+            ensure_generated(repo)
 
 
 if __name__ == "__main__":

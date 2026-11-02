@@ -192,9 +192,7 @@ def _package_name_from_root(root: Path) -> str:
     raw = re.sub(r"[^A-Za-z0-9_]", "_", root.name)
     if not raw or raw[0].isdigit():
         raw = f"_{raw}"
-    while raw in DEFAULT_SKIP or raw.startswith(".") or raw.endswith(
-        (".egg-info", ".dist-info")
-    ):
+    while raw in DEFAULT_SKIP or raw.startswith(".") or raw.endswith((".egg-info", ".dist-info")):
         raw = f"_{raw}"
     return raw
 

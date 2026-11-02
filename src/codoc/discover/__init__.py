@@ -9,14 +9,16 @@ from codoc.config import load_project_config
 _SPEC_FILE = "codoc.spec.yaml"
 _PROJECT_FILE = "codoc.yaml"
 
-DEFAULT_SKIP: frozenset[str] = frozenset({
-    ".git",
-    ".codoc",
-    "site",
-    ".venv",
-    "venv",
-    "__pycache__",
-})
+DEFAULT_SKIP: frozenset[str] = frozenset(
+    {
+        ".git",
+        ".codoc",
+        "site",
+        ".venv",
+        "venv",
+        "__pycache__",
+    }
+)
 
 
 class DiscoverError(Exception):

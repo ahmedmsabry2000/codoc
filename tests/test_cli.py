@@ -6,10 +6,9 @@ from collections.abc import Iterator
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
 
-from tests.tmpdir import temporary_directory
-
 import codoc.cli as cli
 from codoc.discover import git_root
+from tests.tmpdir import temporary_directory
 
 
 def _write(path: Path, text: str = "") -> None:
@@ -52,17 +51,15 @@ def _run_status_in(path: Path) -> tuple[str, str, int | None, Path]:
 class CliTests(unittest.TestCase):
     def test_bare_invocation_prints_help_and_exits_zero(self) -> None:
         stdout = io.StringIO()
-        with redirect_stdout(stdout):
-            with self.assertRaises(SystemExit) as caught:
-                cli.main([])
+        with redirect_stdout(stdout), self.assertRaises(SystemExit) as caught:
+            cli.main([])
         self.assertEqual(caught.exception.code, 0)
         self._assert_help_lists_commands(stdout.getvalue())
 
     def test_help_flag_exits_zero(self) -> None:
         stdout = io.StringIO()
-        with redirect_stdout(stdout):
-            with self.assertRaises(SystemExit) as caught:
-                cli.main(["--help"])
+        with redirect_stdout(stdout), self.assertRaises(SystemExit) as caught:
+            cli.main(["--help"])
         self.assertEqual(caught.exception.code, 0)
         self._assert_help_lists_commands(stdout.getvalue())
 
@@ -71,9 +68,8 @@ class CliTests(unittest.TestCase):
             if command.name in {"init", "status", "build", "serve", "lint", "clean"}:
                 continue
             stderr = io.StringIO()
-            with redirect_stderr(stderr):
-                with self.assertRaises(SystemExit) as caught:
-                    cli.main([command.name])
+            with redirect_stderr(stderr), self.assertRaises(SystemExit) as caught:
+                cli.main([command.name])
             self.assertEqual(caught.exception.code, 2)
             self.assertEqual(
                 stderr.getvalue(),
@@ -92,15 +88,17 @@ class CliTests(unittest.TestCase):
         self.assertEqual(stderr, "")
         self.assertEqual(
             stdout,
-            "\n".join((
-                "spec_path\tscope_dir\tpages",
-                "codoc.spec.yaml\t.\t0",
-                "src/my_project/api/codoc.spec.yaml\tsrc/my_project/api\t0",
-                "src/my_project/cli/codoc.spec.yaml\tsrc/my_project/cli\t0",
-                "src/my_project/codoc.spec.yaml\tsrc/my_project\t0",
-                "registry_pages\t0",
-                "",
-            )),
+            "\n".join(
+                (
+                    "spec_path\tscope_dir\tpages",
+                    "codoc.spec.yaml\t.\t0",
+                    "src/my_project/api/codoc.spec.yaml\tsrc/my_project/api\t0",
+                    "src/my_project/cli/codoc.spec.yaml\tsrc/my_project/cli\t0",
+                    "src/my_project/codoc.spec.yaml\tsrc/my_project\t0",
+                    "registry_pages\t0",
+                    "",
+                )
+            ),
         )
 
     def test_status_with_no_specs_prints_the_header(self) -> None:
@@ -127,31 +125,35 @@ class CliTests(unittest.TestCase):
         self.assertEqual(stderr, f"codoc status: codoc.yaml not found at {root / 'codoc.yaml'}\n")
 
     def test_status_prints_page_counts(self) -> None:
-        spec = "\n".join((
-            "docs:",
-            "  - id: overview",
-            "    type: manual",
-            "    path: docs/overview.md",
-            "  - id: build-serve-loop",
-            "    type: hybrid",
-            "    path: docs/guides/build-serve.md",
-            "coverage:",
-            "  source:",
-            "    - id: cli-core",
-            "      type: auto-generated",
-            "      paths: []",
-            "      docs:",
-            "        - id: cli-core.ref",
-            "          path: docs/reference/cli/index.md",
-            "",
-        ))
-        root_spec = "\n".join((
-            "docs:",
-            "  - id: readme",
-            "    type: manual",
-            "    path: docs/readme.md",
-            "",
-        ))
+        spec = "\n".join(
+            (
+                "docs:",
+                "  - id: overview",
+                "    type: manual",
+                "    path: docs/overview.md",
+                "  - id: build-serve-loop",
+                "    type: hybrid",
+                "    path: docs/guides/build-serve.md",
+                "coverage:",
+                "  source:",
+                "    - id: cli-core",
+                "      type: auto-generated",
+                "      paths: []",
+                "      docs:",
+                "        - id: cli-core.ref",
+                "          path: docs/reference/cli/index.md",
+                "",
+            )
+        )
+        root_spec = "\n".join(
+            (
+                "docs:",
+                "  - id: readme",
+                "    type: manual",
+                "    path: docs/readme.md",
+                "",
+            )
+        )
         with _git_repo() as repo:
             _write(repo / "codoc.yaml")
             _write(repo / "codoc.spec.yaml", root_spec)
@@ -161,13 +163,15 @@ class CliTests(unittest.TestCase):
         self.assertEqual(stderr, "")
         self.assertEqual(
             stdout,
-            "\n".join((
-                "spec_path\tscope_dir\tpages",
-                "codoc.spec.yaml\t.\t1",
-                "src/my_project/cli/codoc.spec.yaml\tsrc/my_project/cli\t3",
-                "registry_pages\t4",
-                "",
-            )),
+            "\n".join(
+                (
+                    "spec_path\tscope_dir\tpages",
+                    "codoc.spec.yaml\t.\t1",
+                    "src/my_project/cli/codoc.spec.yaml\tsrc/my_project/cli\t3",
+                    "registry_pages\t4",
+                    "",
+                )
+            ),
         )
 
     def test_status_unknown_project_key_exits_1(self) -> None:
@@ -183,13 +187,15 @@ class CliTests(unittest.TestCase):
         )
 
     def test_status_invalid_spec_exits_1(self) -> None:
-        spec = "\n".join((
-            "docs:",
-            "  - id: overview",
-            "    type: essay",
-            "    path: docs/overview.md",
-            "",
-        ))
+        spec = "\n".join(
+            (
+                "docs:",
+                "  - id: overview",
+                "    type: essay",
+                "    path: docs/overview.md",
+                "",
+            )
+        )
         with _git_repo() as repo:
             _write(repo / "codoc.yaml")
             _write(repo / "codoc.spec.yaml", spec)
@@ -205,13 +211,15 @@ class CliTests(unittest.TestCase):
         )
 
     def test_status_duplicate_page_id_across_specs_exits_1(self) -> None:
-        spec = "\n".join((
-            "docs:",
-            "  - id: overview",
-            "    type: manual",
-            "    path: docs/overview.md",
-            "",
-        ))
+        spec = "\n".join(
+            (
+                "docs:",
+                "  - id: overview",
+                "    type: manual",
+                "    path: docs/overview.md",
+                "",
+            )
+        )
         with _git_repo() as repo:
             _write(repo / "codoc.yaml")
             _write(repo / "codoc.spec.yaml", spec)
@@ -229,9 +237,8 @@ class CliTests(unittest.TestCase):
 
     def test_drift_alias_prints_validate_not_implemented(self) -> None:
         stderr = io.StringIO()
-        with redirect_stderr(stderr):
-            with self.assertRaises(SystemExit) as caught:
-                cli.main(["drift"])
+        with redirect_stderr(stderr), self.assertRaises(SystemExit) as caught:
+            cli.main(["drift"])
         self.assertEqual(caught.exception.code, 2)
         self.assertEqual(stderr.getvalue(), "codoc validate: not implemented\n")
 
