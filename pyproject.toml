@@ -1,0 +1,14 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "codoc"
+version = "0.0.0"
+description = "Local Python CLI for documentation in one git repo."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+codoc = "codoc.cli:main"
