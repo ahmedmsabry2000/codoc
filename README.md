@@ -6,7 +6,14 @@ Codoc is a local Python CLI. This repository is the installable tool package.
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install -e .
+.venv/bin/pip install -e ".[dev]"
+```
+
+## Format and lint
+
+```bash
+.venv/bin/ruff format .
+.venv/bin/ruff check --fix .
 ```
 
 ## Run

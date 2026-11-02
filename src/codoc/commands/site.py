@@ -8,8 +8,8 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from codoc.engine.codegen import CodegenError, GeneratedPaths, ensure_generated
 from codoc.config import ConfigError, ProjectConfig, load_project_config
+from codoc.engine.codegen import CodegenError, GeneratedPaths, ensure_generated
 
 _PID_FILE = Path(".codoc") / "serve.pid"
 _SERVE_LOG = Path(".codoc") / "logs" / "serve.log"
@@ -71,8 +71,8 @@ def run_serve(start: Path | None = None) -> ServeResult:
     pid_path = paths.root / _PID_FILE
     pid_path.parent.mkdir(parents=True, exist_ok=True)
     # Serve stays up; stdout/stderr go to .codoc/logs/serve.log.
-    log_handle = open(log_path, "w", encoding="utf-8")
-    try:
+    # Close the parent handle after Popen; the child keeps the inherited fd.
+    with open(log_path, "w", encoding="utf-8") as log_handle:
         try:
             proc = subprocess.Popen(
                 [binary, "serve", "-f", config_rel],
@@ -83,8 +83,6 @@ def run_serve(start: Path | None = None) -> ServeResult:
             )
         except FileNotFoundError as err:
             raise SiteError(f"{binary} not found on PATH") from err
-    finally:
-        log_handle.close()
     if proc.poll() is not None:
         raise SiteError(
             f"{binary} serve exited immediately with code {proc.returncode}; "

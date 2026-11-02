@@ -20,7 +20,10 @@ class Command:
 
 
 COMMANDS: tuple[Command, ...] = (
-    Command("init", "Create codoc.yaml, a starter codoc.spec.yaml, docs/, and .codoc/scripts/."),
+    Command(
+        "init",
+        "Create codoc.yaml, a starter codoc.spec.yaml, docs/, and .codoc/scripts/.",
+    ),
     Command("build", "Build the Zensical site."),
     Command("serve", "Serve the Zensical site locally."),
     Command("generate", "Find every codoc.spec.yaml and write docs/."),

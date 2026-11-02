@@ -3,8 +3,6 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-from tests.tmpdir import temporary_directory
-
 from codoc.config import (
     ConfigError,
     EngineConfig,
@@ -14,6 +12,7 @@ from codoc.config import (
     ValeConfig,
     load_project_config,
 )
+from tests.tmpdir import temporary_directory
 
 
 @contextmanager
@@ -73,36 +72,44 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(loaded.ignore_dirs, frozenset())
 
     def test_quoted_boolean_is_rejected(self) -> None:
-        with _file('vale:\n  enabled: "true"\n') as path:
-            with self.assertRaises(ConfigError) as caught:
-                load_project_config(path)
+        with (
+            _file('vale:\n  enabled: "true"\n') as path,
+            self.assertRaises(ConfigError) as caught,
+        ):
+            load_project_config(path)
         self.assertEqual(
             str(caught.exception),
             f"{path}: vale.enabled: expected a boolean",
         )
 
     def test_null_leaf_is_rejected(self) -> None:
-        with _file("llm:\n  provider: null\n") as path:
-            with self.assertRaises(ConfigError) as caught:
-                load_project_config(path)
+        with (
+            _file("llm:\n  provider: null\n") as path,
+            self.assertRaises(ConfigError) as caught,
+        ):
+            load_project_config(path)
         self.assertEqual(
             str(caught.exception),
             f"{path}: llm.provider: expected a non-empty string",
         )
 
     def test_unknown_key_names_the_first_sorted_field(self) -> None:
-        with _file("serve: true\nalpha: 1\n") as path:
-            with self.assertRaises(ConfigError) as caught:
-                load_project_config(path)
+        with (
+            _file("serve: true\nalpha: 1\n") as path,
+            self.assertRaises(ConfigError) as caught,
+        ):
+            load_project_config(path)
         self.assertEqual(
             str(caught.exception),
             f"{path}: document: unknown field 'alpha'",
         )
 
     def test_unknown_nested_key(self) -> None:
-        with _file("engine:\n  port: 8000\n") as path:
-            with self.assertRaises(ConfigError) as caught:
-                load_project_config(path)
+        with (
+            _file("engine:\n  port: 8000\n") as path,
+            self.assertRaises(ConfigError) as caught,
+        ):
+            load_project_config(path)
         self.assertEqual(
             str(caught.exception),
             f"{path}: engine: unknown field 'port'",
@@ -116,9 +123,8 @@ class ConfigTests(unittest.TestCase):
             "ignore:\n  - ''\n",
         ):
             with self.subTest(text=text):
-                with _file(text) as path:
-                    with self.assertRaises(ConfigError) as caught:
-                        load_project_config(path)
+                with _file(text) as path, self.assertRaises(ConfigError) as caught:
+                    load_project_config(path)
                 self.assertEqual(
                     str(caught.exception),
                     f"{path}: ignore[0]: expected a single directory name",
@@ -132,9 +138,8 @@ class ConfigTests(unittest.TestCase):
         }
         for text, field in cases.items():
             with self.subTest(field=field):
-                with _file(text) as path:
-                    with self.assertRaises(ConfigError) as caught:
-                        load_project_config(path)
+                with _file(text) as path, self.assertRaises(ConfigError) as caught:
+                    load_project_config(path)
                 self.assertEqual(
                     str(caught.exception),
                     f"{path}: {field}: expected a relative path",
@@ -142,25 +147,22 @@ class ConfigTests(unittest.TestCase):
 
     def test_repeated_key_is_rejected(self) -> None:
         text = "engine:\n  name: zensical\n  name: other\n"
-        with _file(text) as path:
-            with self.assertRaises(ConfigError) as caught:
-                load_project_config(path)
+        with _file(text) as path, self.assertRaises(ConfigError) as caught:
+            load_project_config(path)
         message = str(caught.exception)
         self.assertIn(f"{path}: invalid YAML:", message)
         self.assertIn("duplicate key", message)
 
     def test_merge_key_is_rejected(self) -> None:
         text = "engine: &base\n  name: zensical\nvale:\n  <<: *base\n"
-        with _file(text) as path:
-            with self.assertRaises(ConfigError) as caught:
-                load_project_config(path)
+        with _file(text) as path, self.assertRaises(ConfigError) as caught:
+            load_project_config(path)
         self.assertIn("invalid YAML:", str(caught.exception))
         self.assertIn("merge key", str(caught.exception))
 
     def test_document_must_be_a_mapping(self) -> None:
-        with _file("- codoc\n") as path:
-            with self.assertRaises(ConfigError) as caught:
-                load_project_config(path)
+        with _file("- codoc\n") as path, self.assertRaises(ConfigError) as caught:
+            load_project_config(path)
         self.assertEqual(str(caught.exception), f"{path}: document must be a mapping")
 
     def test_invalid_utf8(self) -> None:

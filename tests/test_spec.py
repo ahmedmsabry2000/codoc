@@ -3,8 +3,6 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-from tests.tmpdir import temporary_directory
-
 from codoc.model.spec import (
     Coverage,
     CoverageBlock,
@@ -15,6 +13,7 @@ from codoc.model.spec import (
     SpecError,
     load_spec,
 )
+from tests.tmpdir import temporary_directory
 
 
 @contextmanager
@@ -114,228 +113,243 @@ class SpecTests(unittest.TestCase):
         self.assertEqual(loaded.page_count, 3)
 
     def test_explicit_nested_type_must_match_the_block(self) -> None:
-        text = "\n".join((
-            "coverage:",
-            "  source:",
-            "    - id: cli-core",
-            "      type: auto-generated",
-            "      paths: []",
-            "      docs:",
-            "        - id: cli-core.ref",
-            "          type: auto-generated",
-            "          path: docs/reference/cli/index.md",
-            "",
-        ))
+        text = "\n".join(
+            (
+                "coverage:",
+                "  source:",
+                "    - id: cli-core",
+                "      type: auto-generated",
+                "      paths: []",
+                "      docs:",
+                "        - id: cli-core.ref",
+                "          type: auto-generated",
+                "          path: docs/reference/cli/index.md",
+                "",
+            )
+        )
         with _file(text) as path:
             loaded = load_spec(path)
         self.assertEqual(loaded.pages()[0].type, "auto-generated")
         self.assertIsNone(loaded.pages()[0].script)
 
     def test_top_level_page_requires_type(self) -> None:
-        text = "\n".join((
-            "docs:",
-            "  - id: overview",
-            "    path: docs/overview.md",
-            "",
-        ))
-        with _file(text) as path:
-            with self.assertRaises(SpecError) as caught:
-                load_spec(path)
+        text = "\n".join(
+            (
+                "docs:",
+                "  - id: overview",
+                "    path: docs/overview.md",
+                "",
+            )
+        )
+        with _file(text) as path, self.assertRaises(SpecError) as caught:
+            load_spec(path)
         self.assertEqual(str(caught.exception), f"{path}: docs[0]: missing 'type'")
 
     def test_missing_required_field(self) -> None:
-        text = "\n".join((
-            "docs:",
-            "  - id: overview",
-            "    type: manual",
-            "",
-        ))
-        with _file(text) as path:
-            with self.assertRaises(SpecError) as caught:
-                load_spec(path)
+        text = "\n".join(
+            (
+                "docs:",
+                "  - id: overview",
+                "    type: manual",
+                "",
+            )
+        )
+        with _file(text) as path, self.assertRaises(SpecError) as caught:
+            load_spec(path)
         self.assertEqual(str(caught.exception), f"{path}: docs[0]: missing 'path'")
 
     def test_coverage_block_requires_paths(self) -> None:
-        text = "\n".join((
-            "coverage:",
-            "  source:",
-            "    - id: cli-core",
-            "      type: manual",
-            "",
-        ))
-        with _file(text) as path:
-            with self.assertRaises(SpecError) as caught:
-                load_spec(path)
+        text = "\n".join(
+            (
+                "coverage:",
+                "  source:",
+                "    - id: cli-core",
+                "      type: manual",
+                "",
+            )
+        )
+        with _file(text) as path, self.assertRaises(SpecError) as caught:
+            load_spec(path)
         self.assertEqual(
             str(caught.exception),
             f"{path}: coverage.source[0]: missing 'paths'",
         )
 
     def test_invalid_type(self) -> None:
-        text = "\n".join((
-            "docs:",
-            "  - id: overview",
-            "    type: essay",
-            "    path: docs/overview.md",
-            "",
-        ))
-        with _file(text) as path:
-            with self.assertRaises(SpecError) as caught:
-                load_spec(path)
+        text = "\n".join(
+            (
+                "docs:",
+                "  - id: overview",
+                "    type: essay",
+                "    path: docs/overview.md",
+                "",
+            )
+        )
+        with _file(text) as path, self.assertRaises(SpecError) as caught:
+            load_spec(path)
         self.assertEqual(
             str(caught.exception),
             f"{path}: docs[0].type: expected manual, hybrid, or auto-generated",
         )
 
     def test_nested_type_must_equal_the_block_type(self) -> None:
-        text = "\n".join((
-            "coverage:",
-            "  source:",
-            "    - id: cli-core",
-            "      type: auto-generated",
-            "      paths: []",
-            "      docs:",
-            "        - id: cli-core.ref",
-            "          type: manual",
-            "          path: docs/reference/cli/index.md",
-            "",
-        ))
-        with _file(text) as path:
-            with self.assertRaises(SpecError) as caught:
-                load_spec(path)
+        text = "\n".join(
+            (
+                "coverage:",
+                "  source:",
+                "    - id: cli-core",
+                "      type: auto-generated",
+                "      paths: []",
+                "      docs:",
+                "        - id: cli-core.ref",
+                "          type: manual",
+                "          path: docs/reference/cli/index.md",
+                "",
+            )
+        )
+        with _file(text) as path, self.assertRaises(SpecError) as caught:
+            load_spec(path)
         self.assertEqual(
             str(caught.exception),
             f"{path}: coverage.source[0].docs[0].type: expected auto-generated",
         )
 
     def test_unknown_key(self) -> None:
-        text = "\n".join((
-            "docs:",
-            "  - id: overview",
-            "    type: manual",
-            "    path: docs/overview.md",
-            "    owner: docs",
-            "",
-        ))
-        with _file(text) as path:
-            with self.assertRaises(SpecError) as caught:
-                load_spec(path)
+        text = "\n".join(
+            (
+                "docs:",
+                "  - id: overview",
+                "    type: manual",
+                "    path: docs/overview.md",
+                "    owner: docs",
+                "",
+            )
+        )
+        with _file(text) as path, self.assertRaises(SpecError) as caught:
+            load_spec(path)
         self.assertEqual(
             str(caught.exception),
             f"{path}: docs[0]: unknown field 'owner'",
         )
 
     def test_script_and_placeholders_follow_type(self) -> None:
-        script = "\n".join((
-            "docs:",
-            "  - id: overview",
-            "    type: manual",
-            "    path: docs/overview.md",
-            "    script: .codoc/scripts/gen.py",
-            "",
-        ))
-        with _file(script) as path:
-            with self.assertRaises(SpecError) as caught:
-                load_spec(path)
+        script = "\n".join(
+            (
+                "docs:",
+                "  - id: overview",
+                "    type: manual",
+                "    path: docs/overview.md",
+                "    script: .codoc/scripts/gen.py",
+                "",
+            )
+        )
+        with _file(script) as path, self.assertRaises(SpecError) as caught:
+            load_spec(path)
         self.assertEqual(
             str(caught.exception),
             f"{path}: docs[0].script: allowed only when type is auto-generated",
         )
-        placeholders = "\n".join((
-            "docs:",
-            "  - id: overview",
-            "    type: manual",
-            "    path: docs/overview.md",
-            "    placeholders:",
-            "      - id: slot",
-            "        script: .codoc/scripts/fill.py",
-            "",
-        ))
-        with _file(placeholders) as path:
-            with self.assertRaises(SpecError) as caught:
-                load_spec(path)
+        placeholders = "\n".join(
+            (
+                "docs:",
+                "  - id: overview",
+                "    type: manual",
+                "    path: docs/overview.md",
+                "    placeholders:",
+                "      - id: slot",
+                "        script: .codoc/scripts/fill.py",
+                "",
+            )
+        )
+        with _file(placeholders) as path, self.assertRaises(SpecError) as caught:
+            load_spec(path)
         self.assertEqual(
             str(caught.exception),
             f"{path}: docs[0].placeholders: allowed only when type is hybrid",
         )
 
     def test_duplicate_page_id_in_one_file(self) -> None:
-        text = "\n".join((
-            "docs:",
-            "  - id: overview",
-            "    type: manual",
-            "    path: docs/overview.md",
-            "  - id: overview",
-            "    type: hybrid",
-            "    path: docs/other.md",
-            "",
-        ))
-        with _file(text) as path:
-            with self.assertRaises(SpecError) as caught:
-                load_spec(path)
+        text = "\n".join(
+            (
+                "docs:",
+                "  - id: overview",
+                "    type: manual",
+                "    path: docs/overview.md",
+                "  - id: overview",
+                "    type: hybrid",
+                "    path: docs/other.md",
+                "",
+            )
+        )
+        with _file(text) as path, self.assertRaises(SpecError) as caught:
+            load_spec(path)
         self.assertEqual(
             str(caught.exception),
             f"{path}: docs[1].id: duplicate page id 'overview'",
         )
 
     def test_duplicate_page_id_in_a_coverage_block(self) -> None:
-        text = "\n".join((
-            "docs:",
-            "  - id: overview",
-            "    type: manual",
-            "    path: docs/overview.md",
-            "coverage:",
-            "  features:",
-            "    - id: cli-core",
-            "      type: manual",
-            "      paths: []",
-            "      docs:",
-            "        - id: overview",
-            "          path: docs/other.md",
-            "",
-        ))
-        with _file(text) as path:
-            with self.assertRaises(SpecError) as caught:
-                load_spec(path)
+        text = "\n".join(
+            (
+                "docs:",
+                "  - id: overview",
+                "    type: manual",
+                "    path: docs/overview.md",
+                "coverage:",
+                "  features:",
+                "    - id: cli-core",
+                "      type: manual",
+                "      paths: []",
+                "      docs:",
+                "        - id: overview",
+                "          path: docs/other.md",
+                "",
+            )
+        )
+        with _file(text) as path, self.assertRaises(SpecError) as caught:
+            load_spec(path)
         self.assertEqual(
             str(caught.exception),
             f"{path}: coverage.features[0].docs[0].id: duplicate page id 'overview'",
         )
 
     def test_duplicate_coverage_id(self) -> None:
-        text = "\n".join((
-            "coverage:",
-            "  source:",
-            "    - id: cli-core",
-            "      type: manual",
-            "      paths: []",
-            "  features:",
-            "    - id: cli-core",
-            "      type: hybrid",
-            "      paths: []",
-            "",
-        ))
-        with _file(text) as path:
-            with self.assertRaises(SpecError) as caught:
-                load_spec(path)
+        text = "\n".join(
+            (
+                "coverage:",
+                "  source:",
+                "    - id: cli-core",
+                "      type: manual",
+                "      paths: []",
+                "  features:",
+                "    - id: cli-core",
+                "      type: hybrid",
+                "      paths: []",
+                "",
+            )
+        )
+        with _file(text) as path, self.assertRaises(SpecError) as caught:
+            load_spec(path)
         self.assertEqual(
             str(caught.exception),
             f"{path}: coverage.features[0].id: duplicate coverage id 'cli-core'",
         )
 
     def test_block_id_may_match_a_page_id(self) -> None:
-        text = "\n".join((
-            "docs:",
-            "  - id: cli-core",
-            "    type: manual",
-            "    path: docs/overview.md",
-            "coverage:",
-            "  source:",
-            "    - id: cli-core",
-            "      type: manual",
-            "      paths: []",
-            "",
-        ))
+        text = "\n".join(
+            (
+                "docs:",
+                "  - id: cli-core",
+                "    type: manual",
+                "    path: docs/overview.md",
+                "coverage:",
+                "  source:",
+                "    - id: cli-core",
+                "      type: manual",
+                "      paths: []",
+                "",
+            )
+        )
         with _file(text) as path:
             loaded = load_spec(path)
         self.assertEqual(loaded.page_count, 1)
@@ -343,24 +357,24 @@ class SpecTests(unittest.TestCase):
 
     def test_repeated_key_is_rejected(self) -> None:
         text = "docs:\n  - id: overview\n    id: other\n    type: manual\n    path: docs/a.md\n"
-        with _file(text) as path:
-            with self.assertRaises(SpecError) as caught:
-                load_spec(path)
+        with _file(text) as path, self.assertRaises(SpecError) as caught:
+            load_spec(path)
         message = str(caught.exception)
         self.assertIn(f"{path}: invalid YAML:", message)
         self.assertIn("duplicate key", message)
 
     def test_page_path_must_be_relative(self) -> None:
-        text = "\n".join((
-            "docs:",
-            "  - id: overview",
-            "    type: manual",
-            "    path: /docs/overview.md",
-            "",
-        ))
-        with _file(text) as path:
-            with self.assertRaises(SpecError) as caught:
-                load_spec(path)
+        text = "\n".join(
+            (
+                "docs:",
+                "  - id: overview",
+                "    type: manual",
+                "    path: /docs/overview.md",
+                "",
+            )
+        )
+        with _file(text) as path, self.assertRaises(SpecError) as caught:
+            load_spec(path)
         self.assertEqual(
             str(caught.exception),
             f"{path}: docs[0].path: expected a relative path",
