@@ -5,6 +5,7 @@ from pathlib import Path
 
 from codoc.config import ConfigError
 from codoc.discover import DiscoverError, discover, git_root
+from codoc.init_cmd import InitError, run_init
 from codoc.registry import build_page_registry
 from codoc.spec import SpecDocument, SpecError, load_spec
 
@@ -49,6 +50,9 @@ def main(argv: list[str] | None = None) -> None:
         parser.print_help()
         raise SystemExit(0)
     behavior = _BEHAVIOR_BY_TOKEN[args.command]
+    if behavior == "init":
+        _run_init(force=bool(getattr(args, "force", False)))
+        return
     if behavior == "status":
         _run_status()
         return
@@ -59,12 +63,29 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="codoc", description="Codoc command line tool.")
     sub = parser.add_subparsers(dest="command", required=False)
     for command in COMMANDS:
-        sub.add_parser(
+        subparser = sub.add_parser(
             command.name,
             help=command.summary,
             aliases=list(command.aliases),
         )
+        if command.name == "init":
+            subparser.add_argument(
+                "--force",
+                action="store_true",
+                help="Overwrite codoc.yaml, the starter spec, and docs/index.md.",
+            )
     return parser
+
+
+def _run_init(*, force: bool) -> None:
+    try:
+        result = run_init(Path.cwd(), force=force)
+    except InitError as err:
+        for line in str(err).splitlines():
+            print(f"codoc init: {line}", file=sys.stderr)
+        raise SystemExit(1) from err
+    for path in result.written:
+        print(path.as_posix())
 
 
 def _run_status() -> None:
