@@ -5,4 +5,4 @@ alwaysApply: true
 
 Read `AGENTS.md` before editing this repo.
 
-This repository is the Codoc Python package (`codoc` CLI). Keep changes scoped to the requested work. Do not add empty placeholder packages. Do not put roadmap, ticket, milestone, or product-vision text into rules, comments, README, or other repo files. Command names and aliases live only in `COMMANDS` in `src/codoc/cli.py`.
+This repository is the Codoc Python package (`codoc` CLI). Keep changes scoped to the requested work. Do not add empty placeholder packages. Do not put roadmap, ticket, milestone, or product-vision text into rules, comments, README, or other repo files. Command names and aliases live only in `COMMANDS` in `src/codoc/cli/`. After a feature PR merges, delete the local branch and prune remote-tracking refs.
