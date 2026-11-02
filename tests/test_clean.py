@@ -10,8 +10,8 @@ from tests.tmpdir import temporary_directory
 from unittest.mock import patch
 
 import codoc.cli as cli
-from codoc.clean_cmd import CleanError, run_clean
-from codoc.init_cmd import run_init
+from codoc.commands.clean import CleanError, run_clean
+from codoc.commands.init import run_init
 
 
 @contextmanager
@@ -60,7 +60,7 @@ class CleanCmdTests(unittest.TestCase):
             _touch(repo / ".codoc" / "cache" / "x")
             _touch(repo / ".codoc" / "logs" / "serve.log")
             _touch(repo / ".codoc" / "scripts" / "keep.py", "print(1)\n")
-            with patch("codoc.clean_cmd.stop_serve", return_value=False):
+            with patch("codoc.commands.clean.stop_serve", return_value=False):
                 result = run_clean(repo)
             self.assertFalse(result.stopped_serve)
             self.assertFalse((repo / "site").exists())
@@ -80,7 +80,7 @@ class CleanCmdTests(unittest.TestCase):
                 encoding="utf-8",
             )
             _touch(repo / "out" / "html" / "index.html")
-            with patch("codoc.clean_cmd.stop_serve", return_value=False):
+            with patch("codoc.commands.clean.stop_serve", return_value=False):
                 result = run_clean(repo)
             self.assertFalse((repo / "out" / "html").exists())
             self.assertIn(Path("out/html"), result.removed)
@@ -88,7 +88,7 @@ class CleanCmdTests(unittest.TestCase):
     def test_clean_stops_serve(self) -> None:
         with _git_repo() as repo:
             run_init(repo)
-            with patch("codoc.clean_cmd.stop_serve", return_value=True) as stop:
+            with patch("codoc.commands.clean.stop_serve", return_value=True) as stop:
                 result = run_clean(repo)
             stop.assert_called_once()
             self.assertTrue(os.path.samefile(stop.call_args.args[0], repo))
@@ -104,7 +104,7 @@ class CleanCmdTests(unittest.TestCase):
             run_init(repo)
             _touch(repo / "site" / "index.html")
             _touch(repo / "mkdocs.yml")
-            with patch("codoc.clean_cmd.stop_serve", return_value=True):
+            with patch("codoc.commands.clean.stop_serve", return_value=True):
                 out, err, code = _run_in(repo, ["clean"])
         self.assertEqual(code, None)
         self.assertEqual(err, "")

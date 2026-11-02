@@ -3,8 +3,8 @@ from pathlib import Path
 
 from tests.tmpdir import temporary_directory
 
-from codoc.registry import RegistryEntry, build_page_registry
-from codoc.spec import Coverage, CoverageBlock, Page, SpecDocument, SpecError, load_spec
+from codoc.model.registry import RegistryEntry, build_page_registry
+from codoc.model.spec import Coverage, CoverageBlock, Page, SpecDocument, SpecError, load_spec
 
 
 class RegistryTests(unittest.TestCase):

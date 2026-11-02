@@ -11,8 +11,8 @@ from tests.tmpdir import temporary_directory
 from unittest.mock import MagicMock, patch
 
 import codoc.cli as cli
-from codoc.init_cmd import run_init
-from codoc.site_cmd import SiteError, run_build, run_serve, stop_serve
+from codoc.commands.init import run_init
+from codoc.commands.site import SiteError, run_build, run_serve, stop_serve
 
 
 @contextmanager
@@ -54,7 +54,7 @@ def _patch_engine_run(completed: MagicMock):
             return completed
         return real_run(cmd, *args, **kwargs)
 
-    return patch("codoc.site_cmd.subprocess.run", side_effect=run)
+    return patch("codoc.commands.site.subprocess.run", side_effect=run)
 
 
 def _patch_engine_popen(proc: MagicMock):
@@ -65,7 +65,7 @@ def _patch_engine_popen(proc: MagicMock):
             return proc
         return real_popen(cmd, *args, **kwargs)
 
-    return patch("codoc.site_cmd.subprocess.Popen", side_effect=popen)
+    return patch("codoc.commands.site.subprocess.Popen", side_effect=popen)
 
 
 class SiteCmdTests(unittest.TestCase):
@@ -74,7 +74,7 @@ class SiteCmdTests(unittest.TestCase):
             run_init(repo)
             completed = MagicMock(returncode=0)
             with (
-                patch("codoc.site_cmd.shutil.which", return_value="/bin/zensical"),
+                patch("codoc.commands.site.shutil.which", return_value="/bin/zensical"),
                 _patch_engine_run(completed) as run,
             ):
                 result = run_build(repo)
@@ -95,7 +95,7 @@ class SiteCmdTests(unittest.TestCase):
     def test_build_missing_binary(self) -> None:
         with _git_repo() as repo:
             run_init(repo)
-            with patch("codoc.site_cmd.shutil.which", return_value=None):
+            with patch("codoc.commands.site.shutil.which", return_value=None):
                 with self.assertRaises(SiteError) as caught:
                     run_build(repo)
             self.assertIn("zensical not found on PATH", str(caught.exception))
@@ -108,7 +108,7 @@ class SiteCmdTests(unittest.TestCase):
             )
             completed = MagicMock(returncode=0)
             with (
-                patch("codoc.site_cmd.shutil.which", return_value="/bin/mkdocs"),
+                patch("codoc.commands.site.shutil.which", return_value="/bin/mkdocs"),
                 _patch_engine_run(completed) as run,
             ):
                 run_build(repo)
@@ -130,7 +130,7 @@ class SiteCmdTests(unittest.TestCase):
             proc.pid = 4242
             proc.poll.return_value = None
             with (
-                patch("codoc.site_cmd.shutil.which", return_value="/bin/zensical"),
+                patch("codoc.commands.site.shutil.which", return_value="/bin/zensical"),
                 _patch_engine_popen(proc) as popen,
             ):
                 result = run_serve(repo)
@@ -161,8 +161,8 @@ class SiteCmdTests(unittest.TestCase):
             proc.pid = 222
             proc.poll.return_value = None
             with (
-                patch("codoc.site_cmd.shutil.which", return_value="/bin/zensical"),
-                patch("codoc.site_cmd._terminate", return_value=True) as terminate,
+                patch("codoc.commands.site.shutil.which", return_value="/bin/zensical"),
+                patch("codoc.commands.site._terminate", return_value=True) as terminate,
                 _patch_engine_popen(proc),
             ):
                 result = run_serve(repo)
@@ -175,7 +175,7 @@ class SiteCmdTests(unittest.TestCase):
             run_init(repo)
             completed = MagicMock(returncode=0)
             with (
-                patch("codoc.site_cmd.shutil.which", return_value="/bin/zensical"),
+                patch("codoc.commands.site.shutil.which", return_value="/bin/zensical"),
                 _patch_engine_run(completed),
             ):
                 out, err, code = _run_in(repo, ["build"])
@@ -186,7 +186,7 @@ class SiteCmdTests(unittest.TestCase):
     def test_cli_build_missing_binary_exits_1(self) -> None:
         with _git_repo() as repo:
             run_init(repo)
-            with patch("codoc.site_cmd.shutil.which", return_value=None):
+            with patch("codoc.commands.site.shutil.which", return_value=None):
                 out, err, code = _run_in(repo, ["build"])
         self.assertEqual(code, 1)
         self.assertEqual(out, "")
@@ -199,7 +199,7 @@ class SiteCmdTests(unittest.TestCase):
             proc.pid = 99
             proc.poll.return_value = None
             with (
-                patch("codoc.site_cmd.shutil.which", return_value="/bin/zensical"),
+                patch("codoc.commands.site.shutil.which", return_value="/bin/zensical"),
                 _patch_engine_popen(proc),
             ):
                 out, err, code = _run_in(repo, ["serve"])

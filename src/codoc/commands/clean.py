@@ -6,7 +6,7 @@ from pathlib import Path
 
 from codoc.config import ConfigError, load_project_config
 from codoc.discover import DiscoverError, git_root
-from codoc.site_cmd import stop_serve
+from codoc.commands.site import stop_serve
 
 _ENGINE_FILE = Path("mkdocs.yml")
 _GENERATED_DIR = Path(".codoc") / "generated"

@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from codoc.spec import SpecDocument, SpecError
+from codoc.model.spec import SpecDocument, SpecError
 
 
 @dataclass(frozen=True, slots=True)

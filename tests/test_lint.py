@@ -11,8 +11,8 @@ from tests.tmpdir import temporary_directory
 from unittest.mock import MagicMock, patch
 
 import codoc.cli as cli
-from codoc.init_cmd import run_init
-from codoc.lint_cmd import LintError, run_lint
+from codoc.commands.init import run_init
+from codoc.commands.lint import LintError, run_lint
 
 
 @contextmanager
@@ -54,7 +54,7 @@ def _patch_vale_run(completed: MagicMock):
             return completed
         return real_run(cmd, *args, **kwargs)
 
-    return patch("codoc.lint_cmd.subprocess.run", side_effect=run)
+    return patch("codoc.commands.lint.subprocess.run", side_effect=run)
 
 
 class LintCmdTests(unittest.TestCase):
@@ -63,7 +63,7 @@ class LintCmdTests(unittest.TestCase):
             run_init(repo)
             completed = MagicMock(returncode=0)
             with (
-                patch("codoc.lint_cmd.shutil.which", return_value="/bin/vale"),
+                patch("codoc.commands.lint.shutil.which", return_value="/bin/vale"),
                 _patch_vale_run(completed) as run,
             ):
                 result = run_lint(repo)
@@ -84,7 +84,7 @@ class LintCmdTests(unittest.TestCase):
     def test_lint_missing_binary(self) -> None:
         with _git_repo() as repo:
             run_init(repo)
-            with patch("codoc.lint_cmd.shutil.which", return_value=None):
+            with patch("codoc.commands.lint.shutil.which", return_value=None):
                 with self.assertRaises(LintError) as caught:
                     run_lint(repo)
             self.assertIn("vale not found on PATH", str(caught.exception))
@@ -95,7 +95,7 @@ class LintCmdTests(unittest.TestCase):
                 "vale:\n  enabled: false\n",
                 encoding="utf-8",
             )
-            with patch("codoc.lint_cmd.shutil.which") as which:
+            with patch("codoc.commands.lint.shutil.which") as which:
                 result = run_lint(repo)
             which.assert_not_called()
             self.assertTrue(result.skipped)
@@ -105,7 +105,7 @@ class LintCmdTests(unittest.TestCase):
             run_init(repo)
             completed = MagicMock(returncode=1)
             with (
-                patch("codoc.lint_cmd.shutil.which", return_value="/bin/vale"),
+                patch("codoc.commands.lint.shutil.which", return_value="/bin/vale"),
                 _patch_vale_run(completed),
             ):
                 with self.assertRaises(LintError) as caught:
@@ -117,7 +117,7 @@ class LintCmdTests(unittest.TestCase):
             run_init(repo)
             completed = MagicMock(returncode=0)
             with (
-                patch("codoc.lint_cmd.shutil.which", return_value="/bin/vale"),
+                patch("codoc.commands.lint.shutil.which", return_value="/bin/vale"),
                 _patch_vale_run(completed),
             ):
                 out, err, code = _run_in(repo, ["lint"])
@@ -140,7 +140,7 @@ class LintCmdTests(unittest.TestCase):
     def test_cli_lint_missing_binary_exits_1(self) -> None:
         with _git_repo() as repo:
             run_init(repo)
-            with patch("codoc.lint_cmd.shutil.which", return_value=None):
+            with patch("codoc.commands.lint.shutil.which", return_value=None):
                 out, err, code = _run_in(repo, ["lint"])
         self.assertEqual(code, 1)
         self.assertEqual(out, "")

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from tests.tmpdir import temporary_directory
 
-from codoc.spec import (
+from codoc.model.spec import (
     Coverage,
     CoverageBlock,
     Link,

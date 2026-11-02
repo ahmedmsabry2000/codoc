@@ -11,8 +11,8 @@ from tests.tmpdir import temporary_directory
 import codoc.cli as cli
 from codoc.config import load_project_config
 from codoc.discover import git_root
-from codoc.init_cmd import InitError, run_init
-from codoc.spec import load_spec
+from codoc.commands.init import InitError, run_init
+from codoc.model.spec import load_spec
 
 
 @contextmanager

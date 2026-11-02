@@ -3,14 +3,11 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from codoc.clean_cmd import CleanError, run_clean
-from codoc.config import ConfigError
-from codoc.discover import DiscoverError, discover, git_root
-from codoc.init_cmd import InitError, run_init
-from codoc.lint_cmd import LintError, run_lint
-from codoc.registry import build_page_registry
-from codoc.site_cmd import SiteError, run_build, run_serve
-from codoc.spec import SpecDocument, SpecError, load_spec
+from codoc.commands.clean import CleanError, run_clean
+from codoc.commands.init import InitError, run_init
+from codoc.commands.lint import LintError, run_lint
+from codoc.commands.site import SiteError, run_build, run_serve
+from codoc.commands.status import StatusError, run_status
 
 
 @dataclass(frozen=True)
@@ -150,21 +147,14 @@ def _run_clean() -> None:
 
 def _run_status() -> None:
     try:
-        root = git_root(Path.cwd())
-        units = discover(root)
-        loaded: list[tuple[Path, SpecDocument]] = []
-        for unit in units:
-            spec_path = root / unit.spec_path
-            loaded.append((spec_path, load_spec(spec_path)))
-        registry = build_page_registry(loaded)
-    except (DiscoverError, ConfigError, SpecError) as err:
+        result = run_status(Path.cwd())
+    except StatusError as err:
         print(f"codoc status: {err}", file=sys.stderr)
         raise SystemExit(1) from err
     print("spec_path\tscope_dir\tpages")
-    for unit, (_, doc) in zip(units, loaded, strict=True):
-        line = f"{unit.spec_path.as_posix()}\t{unit.scope_dir.as_posix()}\t{doc.page_count}"
-        print(line)
-    print(f"registry_pages\t{len(registry)}")
+    for row in result.rows:
+        print(f"{row.spec_path.as_posix()}\t{row.scope_dir.as_posix()}\t{row.pages}")
+    print(f"registry_pages\t{result.registry_pages}")
 
 
 def _not_implemented(behavior: str) -> None:
