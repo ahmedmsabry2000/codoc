@@ -11,7 +11,7 @@ from codoc.commands.init import InitError, run_init
 from codoc.config import load_project_config
 from codoc.discover import git_root
 from codoc.model.spec import load_spec
-from tests.tmpdir import temporary_directory
+from tests.support.tmpdir import _REPO_ROOT, temporary_directory
 
 
 @contextmanager
@@ -126,7 +126,7 @@ class InitTests(unittest.TestCase):
 
     def test_init_does_not_mkdir_under_cwd(self) -> None:
         # Regression: pkg.mkdir used to be cwd-relative and leaked empty dirs into src/.
-        repo_src = Path(__file__).resolve().parents[1] / "src"
+        repo_src = _REPO_ROOT / "src"
         before = {path.name for path in repo_src.iterdir()}
         with _git_repo("leak-probe") as repo:
             run_init(repo)

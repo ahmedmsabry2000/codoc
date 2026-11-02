@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 import codoc.cli as cli
 from codoc.commands.init import run_init
 from codoc.commands.site import SiteError, run_build, run_serve, stop_serve
-from tests.tmpdir import temporary_directory
+from tests.support.tmpdir import temporary_directory
 
 
 @contextmanager

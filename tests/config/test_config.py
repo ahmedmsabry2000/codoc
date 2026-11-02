@@ -12,7 +12,7 @@ from codoc.config import (
     ValeConfig,
     load_project_config,
 )
-from tests.tmpdir import temporary_directory
+from tests.support.tmpdir import temporary_directory
 
 
 @contextmanager

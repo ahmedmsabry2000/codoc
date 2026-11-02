@@ -15,7 +15,7 @@ from codoc.discover import (
     discover,
     git_root,
 )
-from tests.tmpdir import temporary_directory
+from tests.support.tmpdir import temporary_directory
 
 
 def _write(path: Path, text: str = "") -> None:

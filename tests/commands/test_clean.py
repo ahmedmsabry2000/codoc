@@ -10,7 +10,7 @@ from unittest.mock import patch
 import codoc.cli as cli
 from codoc.commands.clean import CleanError, run_clean
 from codoc.commands.init import run_init
-from tests.tmpdir import temporary_directory
+from tests.support.tmpdir import temporary_directory
 
 
 @contextmanager

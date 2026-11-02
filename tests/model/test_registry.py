@@ -10,7 +10,7 @@ from codoc.model.spec import (
     SpecError,
     load_spec,
 )
-from tests.tmpdir import temporary_directory
+from tests.support.tmpdir import temporary_directory
 
 
 class RegistryTests(unittest.TestCase):

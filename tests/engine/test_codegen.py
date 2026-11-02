@@ -6,7 +6,7 @@ from pathlib import Path
 
 from codoc.config import load_project_config
 from codoc.engine.codegen import CodegenError, ensure_generated, write_generated
-from tests.tmpdir import temporary_directory
+from tests.support.tmpdir import temporary_directory
 
 
 @contextmanager

@@ -2,7 +2,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-from tests.tmpdir import _REPO_ROOT, safe_temp_root, temporary_directory
+from tests.support.tmpdir import _REPO_ROOT, safe_temp_root, temporary_directory
 
 
 class TmpdirTests(unittest.TestCase):

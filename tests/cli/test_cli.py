@@ -8,7 +8,7 @@ from pathlib import Path
 
 import codoc.cli as cli
 from codoc.discover import git_root
-from tests.tmpdir import temporary_directory
+from tests.support.tmpdir import temporary_directory
 
 
 def _write(path: Path, text: str = "") -> None:
