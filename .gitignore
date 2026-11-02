@@ -1,0 +1,9 @@
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+site/
+.codoc/
+# tempfile leftovers if TMPDIR is ever pointed at the package tree
+/src/tmp*/
+/src/codoc_*/
