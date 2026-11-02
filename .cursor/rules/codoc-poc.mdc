@@ -5,8 +5,10 @@ alwaysApply: true
 
 Read `AGENTS.md` before editing this repo.
 
-This checkout is the Codoc tool on macOS. It is a Python CLI for one Python git repo. Git is required. A user project has one root `codoc.yaml` and many walked `codoc.spec.yaml` files, shared `docs/`, tracked `.codoc/scripts/`, and generated engine and Vale files under `.codoc/generated/`. Doc types are `manual`, `hybrid`, and `auto-generated`. The engine is Zensical. Lint is Vale. Users bring their own LLM keys. Do not add other languages, monorepo workspace roots, or SaaS.
+This checkout is the Codoc *tool* on macOS. It is a Python CLI for one Python git repo. Git is required.
 
-T1 leaves root `codoc.yaml`, `docs/`, and `.codoc/` out of this checkout.
+A *user project* has one root `codoc.yaml` and many walked `codoc.spec.yaml` files, shared `docs/`, tracked `.codoc/scripts/`, and generated engine/Vale files under `.codoc/generated/`. Doc types are `manual`, `hybrid`, and `auto-generated`. The engine is Zensical. Lint is Vale. Users bring their own LLM keys. Do not add other languages, monorepo workspace roots, multi-repo discovery, or SaaS in the POC.
 
-T1 leaves generate, validate, Zensical, Vale, and the LLM as the stderr line `codoc <behavior>: not implemented` with exit 2. Command names live only in `COMMANDS` in `src/codoc/cli.py`.
+T1 leaves root `codoc.yaml`, `docs/`, and `.codoc/` out of this checkout. Init scaffolding is T1b. Dogfood of this checkout is T25.
+
+T1 leaves generate, validate, Zensical, Vale, and the LLM as the stderr line `codoc <name>: not implemented` with exit 2 (local stub convention). Command names and aliases live only in `COMMANDS` in `src/codoc/cli.py`. Do not invent product decisions; consult Project store docs linked from `README.md`.

@@ -5,26 +5,34 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Command:
-    """One CLI name. implements is the behavior name. An alias repeats another command's name."""
+    """One CLI command. aliases share this command's not-implemented behavior."""
 
     name: str
     summary: str
-    implements: str
+    aliases: tuple[str, ...] = ()
 
 
 COMMANDS: tuple[Command, ...] = (
-    Command("init", "Create codoc.yaml, a starter codoc.spec.yaml, docs/, and .codoc/scripts/.", "init"),
-    Command("build", "Build the Zensical site.", "build"),
-    Command("serve", "Serve the Zensical site locally.", "serve"),
-    Command("generate", "Find every codoc.spec.yaml and write docs/.", "generate"),
-    Command("validate", "Check docs with git as the staleness signal.", "validate"),
-    Command("lint", "Run Vale.", "lint"),
-    Command("status", "List discovered specs, scope directories, and page counts.", "status"),
-    Command("clean", "Remove generated outputs.", "clean"),
-    Command("drift", "Run validate.", "validate"),
+    Command("init", "Create codoc.yaml, a starter codoc.spec.yaml, docs/, and .codoc/scripts/."),
+    Command("build", "Build the Zensical site."),
+    Command("serve", "Serve the Zensical site locally."),
+    Command("generate", "Find every codoc.spec.yaml and write docs/."),
+    Command(
+        "validate",
+        "Check docs with git as the staleness signal.",
+        aliases=("drift",),
+    ),
+    Command("lint", "Run Vale."),
+    Command("status", "List discovered specs, scope dirs, and page counts."),
+    Command("clean", "Remove generated outputs."),
 )
 
-_BY_NAME: dict[str, Command] = {command.name: command for command in COMMANDS}
+# argparse may set dest to the alias the user typed. Map back to the command name.
+_BEHAVIOR_BY_TOKEN: dict[str, str] = {}
+for _command in COMMANDS:
+    _BEHAVIOR_BY_TOKEN[_command.name] = _command.name
+    for _alias in _command.aliases:
+        _BEHAVIOR_BY_TOKEN[_alias] = _command.name
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -34,17 +42,22 @@ def main(argv: list[str] | None = None) -> None:
     if args.command is None:
         parser.print_help()
         raise SystemExit(0)
-    _not_implemented(_BY_NAME[args.command].implements)
+    _not_implemented(_BEHAVIOR_BY_TOKEN[args.command])
 
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="codoc", description="Codoc command line tool.")
     sub = parser.add_subparsers(dest="command", required=False)
     for command in COMMANDS:
-        sub.add_parser(command.name, help=command.summary)
+        sub.add_parser(
+            command.name,
+            help=command.summary,
+            aliases=list(command.aliases),
+        )
     return parser
 
 
 def _not_implemented(behavior: str) -> None:
+    # Exit 2 is a local stub convention so scripts cannot treat NYI as success.
     print(f"codoc {behavior}: not implemented", file=sys.stderr)
     raise SystemExit(2)
