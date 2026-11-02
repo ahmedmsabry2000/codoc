@@ -3,6 +3,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from codoc.clean_cmd import CleanError, run_clean
 from codoc.config import ConfigError
 from codoc.discover import DiscoverError, discover, git_root
 from codoc.init_cmd import InitError, run_init
@@ -67,6 +68,9 @@ def main(argv: list[str] | None = None) -> None:
     if behavior == "lint":
         _run_lint()
         return
+    if behavior == "clean":
+        _run_clean()
+        return
     _not_implemented(behavior)
 
 
@@ -130,6 +134,18 @@ def _run_lint() -> None:
         print("codoc lint: vale disabled", file=sys.stderr)
         return
     print(result.docs_dir.as_posix())
+
+
+def _run_clean() -> None:
+    try:
+        result = run_clean(Path.cwd())
+    except CleanError as err:
+        print(f"codoc clean: {err}", file=sys.stderr)
+        raise SystemExit(1) from err
+    if result.stopped_serve:
+        print("stopped\tserve")
+    for path in result.removed:
+        print(path.as_posix())
 
 
 def _run_status() -> None:

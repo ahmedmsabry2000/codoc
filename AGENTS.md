@@ -21,4 +21,6 @@ This repository is the Codoc Python package. The installable command is `codoc`.
 
 `codoc lint` refreshes generated configs, then runs `vale --config .codoc/generated/.vale.ini <docs_dir>` when `vale.enabled` is true. On success it prints the docs dir and exits 0. When Vale reports findings or fails, lint prints `codoc lint: vale failed with exit …` to stderr and exits 1. When `vale` is missing from `PATH`, it prints `codoc lint: vale not found on PATH` and exits 1. When `vale.enabled` is false, it skips the binary, prints `codoc lint: vale disabled` to stderr, and exits 0.
 
+`codoc clean` stops a background serve named in `.codoc/serve.pid` when present, then removes the configured `site_dir` (usually `site/`), the generated root `mkdocs.yml`, `.codoc/generated/`, and the runtime dirs `.codoc/cache`, `.codoc/index`, `.codoc/reports`, and `.codoc/logs`. It does not remove `.codoc/scripts/` or `docs/`. Success prints `stopped\tserve` when a serve was stopped, then each removed path, and exits 0. Missing targets are skipped. It prints `codoc clean: ...` to stderr and exits 1 outside a git repo or when `codoc.yaml` is present but invalid.
+
 Every other registered command prints `codoc <name>: not implemented` to stderr and exits 2. `drift` is an alias of `validate`.
