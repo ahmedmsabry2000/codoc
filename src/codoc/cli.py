@@ -3,10 +3,10 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from codoc.codegen import CodegenError, ensure_generated
 from codoc.config import ConfigError
 from codoc.discover import DiscoverError, discover, git_root
 from codoc.init_cmd import InitError, run_init
+from codoc.lint_cmd import LintError, run_lint
 from codoc.registry import build_page_registry
 from codoc.site_cmd import SiteError, run_build, run_serve
 from codoc.spec import SpecDocument, SpecError, load_spec
@@ -65,7 +65,7 @@ def main(argv: list[str] | None = None) -> None:
         _run_serve()
         return
     if behavior == "lint":
-        _run_codegen(behavior)
+        _run_lint()
         return
     _not_implemented(behavior)
 
@@ -120,16 +120,16 @@ def _run_serve() -> None:
     print(f"pidfile\t{result.pid_file.as_posix()}")
 
 
-def _run_codegen(behavior: str) -> None:
+def _run_lint() -> None:
     try:
-        result = ensure_generated(Path.cwd())
-    except CodegenError as err:
-        print(f"codoc {behavior}: {err}", file=sys.stderr)
+        result = run_lint(Path.cwd())
+    except LintError as err:
+        print(f"codoc lint: {err}", file=sys.stderr)
         raise SystemExit(1) from err
-    for path in result.written:
-        print(path.as_posix())
-    print(f"codoc {behavior}: vale not invoked", file=sys.stderr)
-    raise SystemExit(0)
+    if result.skipped:
+        print("codoc lint: vale disabled", file=sys.stderr)
+        return
+    print(result.docs_dir.as_posix())
 
 
 def _run_status() -> None:

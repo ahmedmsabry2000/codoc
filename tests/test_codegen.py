@@ -1,16 +1,12 @@
-import io
-import os
 import subprocess
 import tempfile
 import unittest
 from collections.abc import Iterator
-from contextlib import contextmanager, redirect_stderr, redirect_stdout
+from contextlib import contextmanager
 from pathlib import Path
 
-import codoc.cli as cli
 from codoc.codegen import CodegenError, ensure_generated, write_generated
 from codoc.config import load_project_config
-from codoc.init_cmd import run_init
 
 
 @contextmanager
@@ -25,24 +21,6 @@ def _git_repo() -> Iterator[Path]:
             text=True,
         )
         yield root
-
-
-def _run_in(path: Path, argv: list[str]) -> tuple[str, str, int | None]:
-    previous = os.getcwd()
-    os.chdir(path)
-    stdout = io.StringIO()
-    stderr = io.StringIO()
-    code: int | None = None
-    try:
-        with redirect_stdout(stdout), redirect_stderr(stderr):
-            try:
-                cli.main(argv)
-            except SystemExit as caught:
-                status = caught.code
-                code = status if isinstance(status, int) else None
-        return stdout.getvalue(), stderr.getvalue(), code
-    finally:
-        os.chdir(previous)
 
 
 class CodegenTests(unittest.TestCase):
@@ -101,15 +79,6 @@ class CodegenTests(unittest.TestCase):
             with self.assertRaises(CodegenError) as caught:
                 ensure_generated(repo)
             self.assertIn("unsupported engine", str(caught.exception))
-
-    def test_lint_writes_generated_and_exits_zero(self) -> None:
-        with _git_repo() as repo:
-            run_init(repo)
-            out, err, code = _run_in(repo, ["lint"])
-        self.assertEqual(code, 0)
-        self.assertIn("mkdocs.yml", out)
-        self.assertIn(".codoc/generated/.vale.ini", out)
-        self.assertIn("codoc lint: vale not invoked", err)
 
     def test_missing_codoc_yaml(self) -> None:
         with _git_repo() as repo:
