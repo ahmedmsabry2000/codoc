@@ -3,5 +3,4 @@ venv/
 __pycache__/
 *.py[cod]
 site/
-# The !.codoc/scripts/ exception is T1b.
 .codoc/
