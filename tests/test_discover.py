@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
+from codoc.config import ConfigError
 from codoc.discover import (
     DEFAULT_SKIP,
     DiscoverError,
@@ -156,6 +157,35 @@ class DiscoverTests(unittest.TestCase):
         self.assertEqual(
             tuple(unit.spec_path.as_posix() for unit in units),
             ("keep/codoc.spec.yaml", "src/pkg/codoc.spec.yaml"),
+        )
+
+    def test_ignore_unions_with_default_skip(self) -> None:
+        before = set(DEFAULT_SKIP)
+        with _git_repo() as repo:
+            _write(repo / "codoc.yaml", "ignore:\n  - node_modules\n")
+            _write(repo / "keep" / "codoc.spec.yaml")
+            _write(repo / "node_modules" / "codoc.spec.yaml")
+            _write(repo / "src" / "pkg" / "node_modules" / "codoc.spec.yaml")
+            _write(repo / ".git" / "codoc.spec.yaml")
+            _write(repo / "src" / "distfiles" / "codoc.spec.yaml")
+            units = discover(repo)
+        self.assertEqual(set(DEFAULT_SKIP), before)
+        self.assertNotIn("node_modules", DEFAULT_SKIP)
+        self.assertEqual(
+            tuple(unit.spec_path.as_posix() for unit in units),
+            ("keep/codoc.spec.yaml", "src/distfiles/codoc.spec.yaml"),
+        )
+
+    def test_invalid_project_file_raises_config_error(self) -> None:
+        with _git_repo() as repo:
+            _write(repo / "codoc.yaml", "serve: true\n")
+            _write(repo / "keep" / "codoc.spec.yaml")
+            with self.assertRaises(ConfigError) as caught:
+                discover(repo)
+            root = git_root(repo)
+        self.assertEqual(
+            str(caught.exception),
+            f"{root / 'codoc.yaml'}: document: unknown field 'serve'",
         )
 
     def test_exact_spec_filename(self) -> None:

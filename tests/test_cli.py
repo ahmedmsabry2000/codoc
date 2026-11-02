@@ -94,10 +94,10 @@ class CliTests(unittest.TestCase):
             stdout,
             "\n".join((
                 "spec_path\tscope_dir\tpages",
-                "codoc.spec.yaml\t.\tn/a",
-                "src/my_project/api/codoc.spec.yaml\tsrc/my_project/api\tn/a",
-                "src/my_project/cli/codoc.spec.yaml\tsrc/my_project/cli\tn/a",
-                "src/my_project/codoc.spec.yaml\tsrc/my_project\tn/a",
+                "codoc.spec.yaml\t.\t0",
+                "src/my_project/api/codoc.spec.yaml\tsrc/my_project/api\t0",
+                "src/my_project/cli/codoc.spec.yaml\tsrc/my_project/cli\t0",
+                "src/my_project/codoc.spec.yaml\tsrc/my_project\t0",
                 "",
             )),
         )
@@ -124,6 +124,99 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertEqual(stdout, "")
         self.assertEqual(stderr, f"codoc status: codoc.yaml not found at {root / 'codoc.yaml'}\n")
+
+    def test_status_prints_page_counts(self) -> None:
+        spec = "\n".join((
+            "docs:",
+            "  - id: overview",
+            "    type: manual",
+            "    path: docs/overview.md",
+            "  - id: build-serve-loop",
+            "    type: hybrid",
+            "    path: docs/guides/build-serve.md",
+            "coverage:",
+            "  source:",
+            "    - id: cli-core",
+            "      type: auto-generated",
+            "      paths: []",
+            "      docs:",
+            "        - id: cli-core.ref",
+            "          path: docs/reference/cli/index.md",
+            "",
+        ))
+        with _git_repo() as repo:
+            _write(repo / "codoc.yaml")
+            _write(repo / "codoc.spec.yaml")
+            _write(repo / "src" / "my_project" / "cli" / "codoc.spec.yaml", spec)
+            stdout, stderr, code, _cwd = _run_status_in(repo)
+        self.assertIsNone(code)
+        self.assertEqual(stderr, "")
+        self.assertEqual(
+            stdout,
+            "\n".join((
+                "spec_path\tscope_dir\tpages",
+                "codoc.spec.yaml\t.\t0",
+                "src/my_project/cli/codoc.spec.yaml\tsrc/my_project/cli\t3",
+                "",
+            )),
+        )
+
+    def test_status_unknown_project_key_exits_1(self) -> None:
+        with _git_repo() as repo:
+            _write(repo / "codoc.yaml", "serve: true\n")
+            root = git_root(repo)
+            stdout, stderr, code, _cwd = _run_status_in(repo)
+        self.assertEqual(code, 1)
+        self.assertEqual(stdout, "")
+        self.assertEqual(
+            stderr,
+            f"codoc status: {root / 'codoc.yaml'}: document: unknown field 'serve'\n",
+        )
+
+    def test_status_invalid_spec_exits_1(self) -> None:
+        spec = "\n".join((
+            "docs:",
+            "  - id: overview",
+            "    type: essay",
+            "    path: docs/overview.md",
+            "",
+        ))
+        with _git_repo() as repo:
+            _write(repo / "codoc.yaml")
+            _write(repo / "codoc.spec.yaml", spec)
+            root = git_root(repo)
+            stdout, stderr, code, _cwd = _run_status_in(repo)
+        self.assertEqual(code, 1)
+        self.assertEqual(stdout, "")
+        self.assertEqual(
+            stderr,
+            "codoc status: "
+            f"{root / 'codoc.spec.yaml'}: "
+            "docs[0].type: expected manual, hybrid, or auto-generated\n",
+        )
+
+    def test_status_duplicate_page_id_across_specs_exits_1(self) -> None:
+        spec = "\n".join((
+            "docs:",
+            "  - id: overview",
+            "    type: manual",
+            "    path: docs/overview.md",
+            "",
+        ))
+        with _git_repo() as repo:
+            _write(repo / "codoc.yaml")
+            _write(repo / "codoc.spec.yaml", spec)
+            _write(repo / "src" / "codoc.spec.yaml", spec)
+            root = git_root(repo)
+            stdout, stderr, code, _cwd = _run_status_in(repo)
+        earlier = root / "codoc.spec.yaml"
+        later = root / "src" / "codoc.spec.yaml"
+        self.assertEqual(code, 1)
+        self.assertEqual(stdout, "")
+        self.assertEqual(
+            stderr,
+            f"codoc status: {later}: duplicate page id 'overview' also in {earlier}\n",
+        )
 
     def test_drift_alias_prints_validate_not_implemented(self) -> None:
         stderr = io.StringIO()

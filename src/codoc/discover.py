@@ -4,6 +4,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from codoc.config import load_project_config
+
 _SPEC_FILE = "codoc.spec.yaml"
 _PROJECT_FILE = "codoc.yaml"
 
@@ -63,7 +65,7 @@ def discover(start: Path | None = None) -> tuple[SpecUnit, ...]:
     """Return spec units for the git repo that contains start.
 
     start defaults to the current directory. The walk covers the whole
-    repository. The result is sorted by spec_path. YAML files are not opened.
+    repository. The result is sorted by spec_path. Spec files are not opened.
     """
     if start is None:
         start = Path.cwd()
@@ -71,8 +73,10 @@ def discover(start: Path | None = None) -> tuple[SpecUnit, ...]:
     project = root / _PROJECT_FILE
     if not project.is_file():
         raise DiscoverError(f"{_PROJECT_FILE} not found at {project}")
+    config = load_project_config(project)
+    skip = DEFAULT_SKIP | config.ignore_dirs
     try:
-        return _walk(root)
+        return _walk(root, skip)
     except OSError as err:
         raise DiscoverError(f"cannot read {root}, {err.strerror}") from err
 
@@ -110,14 +114,14 @@ def child_scopes(units: Sequence[SpecUnit]) -> dict[Path, tuple[Path, ...]]:
     return out
 
 
-def _walk(root: Path) -> tuple[SpecUnit, ...]:
+def _walk(root: Path, skip: frozenset[str]) -> tuple[SpecUnit, ...]:
     units: list[SpecUnit] = []
 
     def raise_error(err: OSError) -> None:
         raise err
 
     for dirpath, dirnames, filenames in os.walk(root, followlinks=False, onerror=raise_error):
-        dirnames[:] = [name for name in dirnames if name not in DEFAULT_SKIP]
+        dirnames[:] = [name for name in dirnames if name not in skip]
         if _SPEC_FILE not in filenames:
             continue
         rel = (Path(dirpath) / _SPEC_FILE).relative_to(root)

@@ -1,8 +1,11 @@
 import argparse
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 
-from codoc.discover import DiscoverError, SpecUnit, discover
+from codoc.config import ConfigError
+from codoc.discover import DiscoverError, discover, git_root
+from codoc.spec import SpecDocument, SpecError, check_unique_page_ids, load_spec
 
 
 @dataclass(frozen=True)
@@ -65,17 +68,20 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def _run_status() -> None:
     try:
-        units = discover()
-    except DiscoverError as err:
+        root = git_root(Path.cwd())
+        units = discover(root)
+        loaded: list[tuple[Path, SpecDocument]] = []
+        for unit in units:
+            spec_path = root / unit.spec_path
+            loaded.append((spec_path, load_spec(spec_path)))
+        check_unique_page_ids(loaded)
+    except (DiscoverError, ConfigError, SpecError) as err:
         print(f"codoc status: {err}", file=sys.stderr)
         raise SystemExit(1) from err
-    _print_status(units)
-
-
-def _print_status(units: tuple[SpecUnit, ...]) -> None:
     print("spec_path\tscope_dir\tpages")
-    for unit in units:
-        print(f"{unit.spec_path.as_posix()}\t{unit.scope_dir.as_posix()}\tn/a")
+    for unit, (_, doc) in zip(units, loaded, strict=True):
+        line = f"{unit.spec_path.as_posix()}\t{unit.scope_dir.as_posix()}\t{doc.page_count}"
+        print(line)
 
 
 def _not_implemented(behavior: str) -> None:
