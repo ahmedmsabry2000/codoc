@@ -2,6 +2,8 @@ import argparse
 import sys
 from dataclasses import dataclass
 
+from codoc.discover import DiscoverError, SpecUnit, discover
+
 
 @dataclass(frozen=True)
 class Command:
@@ -42,7 +44,11 @@ def main(argv: list[str] | None = None) -> None:
     if args.command is None:
         parser.print_help()
         raise SystemExit(0)
-    _not_implemented(_BEHAVIOR_BY_TOKEN[args.command])
+    behavior = _BEHAVIOR_BY_TOKEN[args.command]
+    if behavior == "status":
+        _run_status()
+        return
+    _not_implemented(behavior)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -55,6 +61,21 @@ def _build_parser() -> argparse.ArgumentParser:
             aliases=list(command.aliases),
         )
     return parser
+
+
+def _run_status() -> None:
+    try:
+        units = discover()
+    except DiscoverError as err:
+        print(f"codoc status: {err}", file=sys.stderr)
+        raise SystemExit(1) from err
+    _print_status(units)
+
+
+def _print_status(units: tuple[SpecUnit, ...]) -> None:
+    print("spec_path\tscope_dir\tpages")
+    for unit in units:
+        print(f"{unit.spec_path.as_posix()}\t{unit.scope_dir.as_posix()}\tn/a")
 
 
 def _not_implemented(behavior: str) -> None:

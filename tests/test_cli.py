@@ -1,8 +1,52 @@
 import io
+import os
+import subprocess
+import tempfile
 import unittest
-from contextlib import redirect_stderr, redirect_stdout
+from collections.abc import Iterator
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
+from pathlib import Path
 
 import codoc.cli as cli
+from codoc.discover import git_root
+
+
+def _write(path: Path, text: str = "") -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text)
+
+
+@contextmanager
+def _git_repo() -> Iterator[Path]:
+    with tempfile.TemporaryDirectory() as raw:
+        root = Path(raw)
+        subprocess.run(
+            ["git", "init", "-q"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        yield root
+
+
+def _run_status_in(path: Path) -> tuple[str, str, int | None, Path]:
+    previous = os.getcwd()
+    os.chdir(path)
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    code: int | None = None
+    try:
+        cwd = Path.cwd()
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            try:
+                cli.main(["status"])
+            except SystemExit as caught:
+                status = caught.code
+                code = status if isinstance(status, int) else None
+        return stdout.getvalue(), stderr.getvalue(), code, cwd
+    finally:
+        os.chdir(previous)
 
 
 class CliTests(unittest.TestCase):
@@ -22,8 +66,10 @@ class CliTests(unittest.TestCase):
         self.assertEqual(caught.exception.code, 0)
         self._assert_help_lists_commands(stdout.getvalue())
 
-    def test_each_command_prints_not_implemented_to_stderr(self) -> None:
+    def test_unimplemented_commands_print_not_implemented_to_stderr(self) -> None:
         for command in cli.COMMANDS:
+            if command.name == "status":
+                continue
             stderr = io.StringIO()
             with redirect_stderr(stderr):
                 with self.assertRaises(SystemExit) as caught:
@@ -33,6 +79,51 @@ class CliTests(unittest.TestCase):
                 stderr.getvalue(),
                 f"codoc {command.name}: not implemented\n",
             )
+
+    def test_status_prints_tsv_and_exits_zero(self) -> None:
+        with _git_repo() as repo:
+            _write(repo / "codoc.yaml")
+            _write(repo / "codoc.spec.yaml")
+            _write(repo / "src" / "my_project" / "codoc.spec.yaml")
+            _write(repo / "src" / "my_project" / "api" / "codoc.spec.yaml")
+            _write(repo / "src" / "my_project" / "cli" / "codoc.spec.yaml")
+            stdout, stderr, code, _cwd = _run_status_in(repo)
+        self.assertIsNone(code)
+        self.assertEqual(stderr, "")
+        self.assertEqual(
+            stdout,
+            "\n".join((
+                "spec_path\tscope_dir\tpages",
+                "codoc.spec.yaml\t.\tn/a",
+                "src/my_project/api/codoc.spec.yaml\tsrc/my_project/api\tn/a",
+                "src/my_project/cli/codoc.spec.yaml\tsrc/my_project/cli\tn/a",
+                "src/my_project/codoc.spec.yaml\tsrc/my_project\tn/a",
+                "",
+            )),
+        )
+
+    def test_status_with_no_specs_prints_the_header(self) -> None:
+        with _git_repo() as repo:
+            _write(repo / "codoc.yaml")
+            stdout, stderr, code, _cwd = _run_status_in(repo)
+        self.assertIsNone(code)
+        self.assertEqual(stderr, "")
+        self.assertEqual(stdout, "spec_path\tscope_dir\tpages\n")
+
+    def test_status_outside_a_repo_exits_1(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            stdout, stderr, code, cwd = _run_status_in(Path(raw))
+        self.assertEqual(code, 1)
+        self.assertEqual(stdout, "")
+        self.assertEqual(stderr, f"codoc status: not a git repository at {cwd}\n")
+
+    def test_status_without_codoc_yaml_exits_1(self) -> None:
+        with _git_repo() as repo:
+            root = git_root(repo)
+            stdout, stderr, code, _cwd = _run_status_in(repo)
+        self.assertEqual(code, 1)
+        self.assertEqual(stdout, "")
+        self.assertEqual(stderr, f"codoc status: codoc.yaml not found at {root / 'codoc.yaml'}\n")
 
     def test_drift_alias_prints_validate_not_implemented(self) -> None:
         stderr = io.StringIO()
