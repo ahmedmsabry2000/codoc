@@ -8,6 +8,7 @@ Requires [uv](https://docs.astral.sh/uv/).
 
 ```bash
 uv sync
+uv run pre-commit install
 ```
 
 ## Format and lint
@@ -16,6 +17,8 @@ uv sync
 uv run ruff format .
 uv run ruff check --fix .
 ```
+
+Git hooks run the same checks on commit via pre-commit (`uv run pre-commit run --all-files`).
 
 ## Test
 
