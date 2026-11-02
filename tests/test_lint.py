@@ -6,13 +6,12 @@ import unittest
 from collections.abc import Iterator
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
-
-from tests.tmpdir import temporary_directory
 from unittest.mock import MagicMock, patch
 
 import codoc.cli as cli
 from codoc.commands.init import run_init
 from codoc.commands.lint import LintError, run_lint
+from tests.tmpdir import temporary_directory
 
 
 @contextmanager
@@ -84,9 +83,11 @@ class LintCmdTests(unittest.TestCase):
     def test_lint_missing_binary(self) -> None:
         with _git_repo() as repo:
             run_init(repo)
-            with patch("codoc.commands.lint.shutil.which", return_value=None):
-                with self.assertRaises(LintError) as caught:
-                    run_lint(repo)
+            with (
+                patch("codoc.commands.lint.shutil.which", return_value=None),
+                self.assertRaises(LintError) as caught,
+            ):
+                run_lint(repo)
             self.assertIn("vale not found on PATH", str(caught.exception))
 
     def test_lint_disabled_skips_vale(self) -> None:
@@ -107,9 +108,9 @@ class LintCmdTests(unittest.TestCase):
             with (
                 patch("codoc.commands.lint.shutil.which", return_value="/bin/vale"),
                 _patch_vale_run(completed),
+                self.assertRaises(LintError) as caught,
             ):
-                with self.assertRaises(LintError) as caught:
-                    run_lint(repo)
+                run_lint(repo)
             self.assertIn("vale failed with exit 1", str(caught.exception))
 
     def test_cli_lint_prints_docs_dir(self) -> None:

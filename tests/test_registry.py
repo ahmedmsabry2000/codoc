@@ -1,10 +1,16 @@
 import unittest
 from pathlib import Path
 
-from tests.tmpdir import temporary_directory
-
 from codoc.model.registry import RegistryEntry, build_page_registry
-from codoc.model.spec import Coverage, CoverageBlock, Page, SpecDocument, SpecError, load_spec
+from codoc.model.spec import (
+    Coverage,
+    CoverageBlock,
+    Page,
+    SpecDocument,
+    SpecError,
+    load_spec,
+)
+from tests.tmpdir import temporary_directory
 
 
 class RegistryTests(unittest.TestCase):
@@ -57,13 +63,15 @@ class RegistryTests(unittest.TestCase):
             registry.lookup("missing")
 
     def test_duplicate_page_id_across_specs_fails(self) -> None:
-        text = "\n".join((
-            "docs:",
-            "  - id: overview",
-            "    type: manual",
-            "    path: docs/overview.md",
-            "",
-        ))
+        text = "\n".join(
+            (
+                "docs:",
+                "  - id: overview",
+                "    type: manual",
+                "    path: docs/overview.md",
+                "",
+            )
+        )
         with temporary_directory() as root:
             earlier = root / "src" / "my_project" / "codoc.spec.yaml"
             later = root / "src" / "my_project" / "cli" / "codoc.spec.yaml"

@@ -218,9 +218,7 @@ def _terms(data: dict, fail) -> tuple[str, ...]:
     raw = data["terms"]
     if not isinstance(raw, list):
         raise fail("terms: expected a list")
-    return tuple(
-        _nonempty_str(item, f"terms[{index}]", fail) for index, item in enumerate(raw)
-    )
+    return tuple(_nonempty_str(item, f"terms[{index}]", fail) for index, item in enumerate(raw))
 
 
 def _ignore(data: dict, fail) -> frozenset[str]:

@@ -4,9 +4,9 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
+from codoc.commands.site import stop_serve
 from codoc.config import ConfigError, load_project_config
 from codoc.discover import DiscoverError, git_root
-from codoc.commands.site import stop_serve
 
 _ENGINE_FILE = Path("mkdocs.yml")
 _GENERATED_DIR = Path(".codoc") / "generated"

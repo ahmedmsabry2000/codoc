@@ -5,13 +5,12 @@ import unittest
 from collections.abc import Iterator
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
-
-from tests.tmpdir import temporary_directory
 from unittest.mock import patch
 
 import codoc.cli as cli
 from codoc.commands.clean import CleanError, run_clean
 from codoc.commands.init import run_init
+from tests.tmpdir import temporary_directory
 
 
 @contextmanager
@@ -95,9 +94,8 @@ class CleanCmdTests(unittest.TestCase):
             self.assertTrue(result.stopped_serve)
 
     def test_clean_outside_repo_raises(self) -> None:
-        with temporary_directory() as root:
-            with self.assertRaises(CleanError):
-                run_clean(root)
+        with temporary_directory() as root, self.assertRaises(CleanError):
+            run_clean(root)
 
     def test_cli_clean_prints_removed_paths(self) -> None:
         with _git_repo() as repo:

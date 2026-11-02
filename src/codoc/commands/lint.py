@@ -5,8 +5,8 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from codoc.engine.codegen import CodegenError, GeneratedPaths, ensure_generated
 from codoc.config import ConfigError, ProjectConfig, load_project_config
+from codoc.engine.codegen import CodegenError, GeneratedPaths, ensure_generated
 
 
 class LintError(Exception):

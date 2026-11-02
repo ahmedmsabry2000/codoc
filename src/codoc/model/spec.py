@@ -357,9 +357,7 @@ def _parse_block(item: object, where: str, fail):
 def _globs(raw: object, where: str, fail) -> tuple[str, ...]:
     if not isinstance(raw, list):
         raise fail(f"{where}: expected a list")
-    return tuple(
-        _relative_path(item, f"{where}[{index}]", fail) for index, item in enumerate(raw)
-    )
+    return tuple(_relative_path(item, f"{where}[{index}]", fail) for index, item in enumerate(raw))
 
 
 def _reject_duplicate_pages(pages: list[tuple[Page, str]], fail) -> None:

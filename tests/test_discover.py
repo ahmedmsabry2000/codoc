@@ -4,8 +4,6 @@ import unittest
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-
-from tests.tmpdir import temporary_directory
 from unittest.mock import patch
 
 from codoc.config import ConfigError
@@ -17,6 +15,7 @@ from codoc.discover import (
     discover,
     git_root,
 )
+from tests.tmpdir import temporary_directory
 
 
 def _write(path: Path, text: str = "") -> None:
@@ -56,9 +55,11 @@ class DiscoverTests(unittest.TestCase):
     def test_git_not_on_path(self) -> None:
         with temporary_directory() as raw:
             start = Path(raw)
-            with patch.dict(os.environ, {"PATH": str(start)}):
-                with self.assertRaises(DiscoverError) as caught:
-                    discover(start)
+            with (
+                patch.dict(os.environ, {"PATH": str(start)}),
+                self.assertRaises(DiscoverError) as caught,
+            ):
+                discover(start)
         self.assertEqual(str(caught.exception), "git not on PATH")
 
     def test_missing_codoc_yaml(self) -> None:

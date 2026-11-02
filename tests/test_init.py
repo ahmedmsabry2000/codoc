@@ -6,13 +6,12 @@ from collections.abc import Iterator
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
 
-from tests.tmpdir import temporary_directory
-
 import codoc.cli as cli
+from codoc.commands.init import InitError, run_init
 from codoc.config import load_project_config
 from codoc.discover import git_root
-from codoc.commands.init import InitError, run_init
 from codoc.model.spec import load_spec
+from tests.tmpdir import temporary_directory
 
 
 @contextmanager

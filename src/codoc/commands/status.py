@@ -37,13 +37,8 @@ def run_status(start: Path | None = None) -> StatusResult:
         for unit in units:
             spec_path = root / unit.spec_path
             loaded.append((unit, load_spec(spec_path)))
-        registry = build_page_registry(
-            tuple((root / unit.spec_path, doc) for unit, doc in loaded)
-        )
+        registry = build_page_registry(tuple((root / unit.spec_path, doc) for unit, doc in loaded))
     except (DiscoverError, ConfigError, SpecError) as err:
         raise StatusError(str(err)) from err
-    rows = tuple(
-        StatusRow(unit.spec_path, unit.scope_dir, doc.page_count)
-        for unit, doc in loaded
-    )
+    rows = tuple(StatusRow(unit.spec_path, unit.scope_dir, doc.page_count) for unit, doc in loaded)
     return StatusResult(rows=rows, registry_pages=len(registry))
