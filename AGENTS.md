@@ -5,10 +5,12 @@ This repository is the Codoc Python package. The installable command is `codoc`.
 ## Working in this tree
 
 - Put CLI command names and aliases only in `COMMANDS` in `src/codoc/cli/`.
-- Keep package code under `src/codoc/{cli,commands,config,discover,engine,model}/`. Mirror that layout under `tests/` (`tests/support/` for shared fixtures).
+- Keep package code under `src/codoc/{cli,commands,config,discover,engine,model}/`. Mirror that layout under `tests/` (`tests/support/` for shared helpers; shared pytest fixtures in `tests/conftest.py`).
+- Prefer pytest fixtures and `@pytest.mark.parametrize` over copied setup or hand-rolled case loops.
 - Unknown work stays out of the tree. Add a module when you are implementing it, not as an empty placeholder.
 - Do not expand scope beyond the change you were asked to make.
 - Do not add roadmap, ticket, milestone, or product-vision notes to the repo (rules, comments, README, commit messages that narrate a plan). Keep the tree about the code that exists.
+- Name feature branches with short descriptive slugs (for example `engine-shim`). Do **not** use a `cursor/` prefix on branch names.
 - After a feature PR merges, delete the local branch and prune stale remote-tracking refs (`git branch -d <branch>`; `git fetch --prune`).
 
 ## Current CLI behavior

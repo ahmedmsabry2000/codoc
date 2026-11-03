@@ -1,6 +1,3 @@
-from collections.abc import Iterator
-from contextlib import contextmanager
-from pathlib import Path
 
 import pytest
 
@@ -14,16 +11,7 @@ from codoc.model.spec import (
     SpecError,
     load_spec,
 )
-from tests.support.tmpdir import temporary_directory
-
-
-@contextmanager
-def _file(text: str, name: str = "codoc.spec.yaml") -> Iterator[Path]:
-    with temporary_directory() as raw:
-        path = Path(raw) / name
-        path.write_text(text)
-        yield path
-
+from tests.support.fs import yaml_file
 
 _SPEC = """\
 docs:
@@ -57,16 +45,16 @@ coverage:
 
 
 class SpecTests:
-    def test_empty_spec_has_no_pages(self) -> None:
-        for text in ("", "# comment\n", "null\n"):
-            with _file(text) as path:
-                loaded = load_spec(path)
-            assert loaded == SpecDocument()
-            assert loaded.page_count == 0
-            assert loaded.pages() == ()
+    @pytest.mark.parametrize("text", ["", "# comment\n", "null\n"])
+    def test_empty_spec_has_no_pages(self, text: str) -> None:
+        with yaml_file(text) as path:
+            loaded = load_spec(path)
+        assert loaded == SpecDocument()
+        assert loaded.page_count == 0
+        assert loaded.pages() == ()
 
     def test_valid_spec(self) -> None:
-        with _file(_SPEC) as path:
+        with yaml_file(_SPEC) as path:
             loaded = load_spec(path)
         assert loaded.docs == (
             Page("overview", "manual", "docs/overview.md"),
@@ -122,7 +110,7 @@ class SpecTests:
                 "",
             )
         )
-        with _file(text) as path:
+        with yaml_file(text) as path:
             loaded = load_spec(path)
         assert loaded.pages()[0].type == "auto-generated"
         assert loaded.pages()[0].script is None
@@ -136,7 +124,7 @@ class SpecTests:
                 "",
             )
         )
-        with _file(text) as path, pytest.raises(SpecError) as caught:
+        with yaml_file(text) as path, pytest.raises(SpecError) as caught:
             load_spec(path)
         assert str(caught.value) == f"{path}: docs[0]: missing 'type'"
 
@@ -149,7 +137,7 @@ class SpecTests:
                 "",
             )
         )
-        with _file(text) as path, pytest.raises(SpecError) as caught:
+        with yaml_file(text) as path, pytest.raises(SpecError) as caught:
             load_spec(path)
         assert str(caught.value) == f"{path}: docs[0]: missing 'path'"
 
@@ -163,7 +151,7 @@ class SpecTests:
                 "",
             )
         )
-        with _file(text) as path, pytest.raises(SpecError) as caught:
+        with yaml_file(text) as path, pytest.raises(SpecError) as caught:
             load_spec(path)
         assert str(caught.value) == f"{path}: coverage.source[0]: missing 'paths'"
 
@@ -177,7 +165,7 @@ class SpecTests:
                 "",
             )
         )
-        with _file(text) as path, pytest.raises(SpecError) as caught:
+        with yaml_file(text) as path, pytest.raises(SpecError) as caught:
             load_spec(path)
         assert (
             str(caught.value) == f"{path}: docs[0].type: expected manual, hybrid, or auto-generated"
@@ -198,7 +186,7 @@ class SpecTests:
                 "",
             )
         )
-        with _file(text) as path, pytest.raises(SpecError) as caught:
+        with yaml_file(text) as path, pytest.raises(SpecError) as caught:
             load_spec(path)
         assert (
             str(caught.value) == f"{path}: coverage.source[0].docs[0].type: expected auto-generated"
@@ -215,7 +203,7 @@ class SpecTests:
                 "",
             )
         )
-        with _file(text) as path, pytest.raises(SpecError) as caught:
+        with yaml_file(text) as path, pytest.raises(SpecError) as caught:
             load_spec(path)
         assert str(caught.value) == f"{path}: docs[0]: unknown field 'owner'"
 
@@ -230,7 +218,7 @@ class SpecTests:
                 "",
             )
         )
-        with _file(script) as path, pytest.raises(SpecError) as caught:
+        with yaml_file(script) as path, pytest.raises(SpecError) as caught:
             load_spec(path)
         assert (
             str(caught.value) == f"{path}: docs[0].script: allowed only when type is auto-generated"
@@ -247,7 +235,7 @@ class SpecTests:
                 "",
             )
         )
-        with _file(placeholders) as path, pytest.raises(SpecError) as caught:
+        with yaml_file(placeholders) as path, pytest.raises(SpecError) as caught:
             load_spec(path)
         assert (
             str(caught.value) == f"{path}: docs[0].placeholders: allowed only when type is hybrid"
@@ -266,7 +254,7 @@ class SpecTests:
                 "",
             )
         )
-        with _file(text) as path, pytest.raises(SpecError) as caught:
+        with yaml_file(text) as path, pytest.raises(SpecError) as caught:
             load_spec(path)
         assert str(caught.value) == f"{path}: docs[1].id: duplicate page id 'overview'"
 
@@ -288,7 +276,7 @@ class SpecTests:
                 "",
             )
         )
-        with _file(text) as path, pytest.raises(SpecError) as caught:
+        with yaml_file(text) as path, pytest.raises(SpecError) as caught:
             load_spec(path)
         assert (
             str(caught.value)
@@ -310,7 +298,7 @@ class SpecTests:
                 "",
             )
         )
-        with _file(text) as path, pytest.raises(SpecError) as caught:
+        with yaml_file(text) as path, pytest.raises(SpecError) as caught:
             load_spec(path)
         assert (
             str(caught.value)
@@ -332,14 +320,14 @@ class SpecTests:
                 "",
             )
         )
-        with _file(text) as path:
+        with yaml_file(text) as path:
             loaded = load_spec(path)
         assert loaded.page_count == 1
         assert loaded.coverage.source[0].id == "cli-core"
 
     def test_repeated_key_is_rejected(self) -> None:
         text = "docs:\n  - id: overview\n    id: other\n    type: manual\n    path: docs/a.md\n"
-        with _file(text) as path, pytest.raises(SpecError) as caught:
+        with yaml_file(text) as path, pytest.raises(SpecError) as caught:
             load_spec(path)
         message = str(caught.value)
         assert f"{path}: invalid YAML:" in message
@@ -355,6 +343,6 @@ class SpecTests:
                 "",
             )
         )
-        with _file(text) as path, pytest.raises(SpecError) as caught:
+        with yaml_file(text) as path, pytest.raises(SpecError) as caught:
             load_spec(path)
         assert str(caught.value) == f"{path}: docs[0].path: expected a relative path"
