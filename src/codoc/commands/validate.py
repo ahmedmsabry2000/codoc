@@ -1,0 +1,283 @@
+"""Git-first validate with structural checks, RAG index, and optional Stage D."""
+
+import os
+import re
+import subprocess
+from dataclasses import dataclass
+from pathlib import Path
+
+from codoc.config import ConfigError, LlmConfig, load_project_config
+from codoc.discover import DiscoverError, SpecUnit, discover, git_root
+from codoc.generate.frontmatter import split_frontmatter
+from codoc.llm import LlmError, chat_completion, resolve_api_key
+from codoc.model.registry import PageRegistry, build_page_registry
+from codoc.model.spec import Page, SpecDocument, SpecError, load_spec
+from codoc.rag.index import build_rag_index, retrieve, write_rag_index
+
+_MD_LINK = re.compile(r"(?<!!)\[([^\]]*)\]\(([^)]+)\)")
+
+
+class ValidateError(Exception):
+    """Validate found blocking problems."""
+
+
+@dataclass(frozen=True, slots=True)
+class Finding:
+    severity: str
+    code: str
+    message: str
+    path: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ValidateResult:
+    findings: tuple[Finding, ...]
+    candidates: tuple[str, ...]
+    rag_path: Path | None
+    notes: tuple[str, ...] = ()
+
+    @property
+    def ok(self) -> bool:
+        return not any(item.severity == "error" for item in self.findings)
+
+
+def run_validate(start: Path | None = None) -> ValidateResult:
+    """Run structural checks, refresh the RAG index, and optionally Stage D."""
+    if start is None:
+        start = Path.cwd()
+    try:
+        root = git_root(start)
+        config = load_project_config(root / "codoc.yaml")
+        units = discover(root)
+        loaded: list[tuple[SpecUnit, SpecDocument]] = []
+        for unit in units:
+            loaded.append((unit, load_spec(root / unit.spec_path)))
+        registry = build_page_registry(tuple((root / unit.spec_path, doc) for unit, doc in loaded))
+    except (DiscoverError, ConfigError, SpecError) as err:
+        raise ValidateError(str(err)) from err
+
+    findings: list[Finding] = []
+    page_files: list[tuple[str, Path, str]] = []
+    coverage_files: set[str] = set()
+
+    for unit, doc in loaded:
+        coverage_files.update(_coverage_files(root, unit.scope_dir, doc))
+        for page in doc.pages():
+            abs_path = root / page.path
+            page_files.append((page.id, abs_path, page.path))
+            findings.extend(_check_page(root, page, abs_path, registry))
+
+    candidates = _git_candidates(root, coverage_files)
+    rag_chunks = build_rag_index(page_files)
+    rag_path = write_rag_index(root, rag_chunks)
+
+    notes: list[str] = []
+    if candidates:
+        findings.append(
+            Finding(
+                "info",
+                "git.candidates",
+                f"{len(candidates)} coverage file(s) changed since HEAD",
+            )
+        )
+        stage_d = _stage_d(config.llm, candidates, rag_chunks)
+        findings.extend(stage_d.findings)
+        notes.extend(stage_d.notes)
+
+    return ValidateResult(
+        findings=tuple(findings),
+        candidates=tuple(candidates),
+        rag_path=rag_path,
+        notes=tuple(notes),
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _StageD:
+    findings: tuple[Finding, ...]
+    notes: tuple[str, ...]
+
+
+def _stage_d(
+    llm: LlmConfig,
+    candidates: tuple[str, ...] | list[str],
+    chunks: tuple,
+) -> _StageD:
+    if not llm.provider or not llm.model:
+        return _StageD((), ("stage D skipped: llm.provider/model not set",))
+    api_key = resolve_api_key(llm.provider)
+    if not api_key:
+        return _StageD((), (f"stage D skipped: no API key for {llm.provider}",))
+    context = retrieve(chunks, " ".join(candidates), limit=5)
+    context_text = (
+        "\n\n".join(
+            f"[{chunk.page_id} {chunk.path}#{chunk.heading}]\n{chunk.text[:400]}"
+            for chunk in context
+        )
+        or "(no docs chunks)"
+    )
+    prompt = (
+        "You review documentation drift for a Python repo.\n"
+        "Changed source files:\n"
+        + "\n".join(f"- {path}" for path in candidates)
+        + "\n\nRelated docs excerpts:\n"
+        + context_text
+        + "\n\nReply with one short paragraph: OK if docs look aligned, "
+        "or name the page ids that likely need regeneration."
+    )
+    try:
+        answer = chat_completion(
+            provider=llm.provider,
+            model=llm.model,
+            api_key=api_key,
+            messages=[
+                {"role": "system", "content": "You are a concise docs drift reviewer."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+    except LlmError as err:
+        return _StageD((), (f"stage D skipped: {err}",))
+    return _StageD(
+        (Finding("info", "stage.d", answer.strip()[:500]),),
+        (),
+    )
+
+
+def _check_page(
+    root: Path,
+    page: Page,
+    abs_path: Path,
+    registry: PageRegistry,
+) -> list[Finding]:
+    findings: list[Finding] = []
+    if not abs_path.is_file():
+        findings.append(
+            Finding("error", "page.missing", f"missing page file for {page.id}", page.path)
+        )
+        return findings
+
+    text = abs_path.read_text(encoding="utf-8")
+    split = split_frontmatter(text)
+    if split.frontmatter is None:
+        findings.append(
+            Finding("error", "frontmatter.missing", "missing codoc frontmatter", page.path)
+        )
+    else:
+        if split.frontmatter.id != page.id:
+            findings.append(
+                Finding(
+                    "error",
+                    "frontmatter.id",
+                    f"frontmatter id {split.frontmatter.id!r} != spec {page.id!r}",
+                    page.path,
+                )
+            )
+        if split.frontmatter.type != page.type:
+            findings.append(
+                Finding(
+                    "error",
+                    "frontmatter.type",
+                    f"frontmatter type {split.frontmatter.type!r} != spec {page.type!r}",
+                    page.path,
+                )
+            )
+
+    if page.type == "auto-generated" and page.script and not (root / page.script).is_file():
+        findings.append(
+            Finding("error", "script.missing", f"script not found: {page.script}", page.path)
+        )
+    for placeholder in page.placeholders:
+        if not (root / placeholder.script).is_file():
+            findings.append(
+                Finding(
+                    "error",
+                    "script.missing",
+                    f"placeholder script not found: {placeholder.script}",
+                    page.path,
+                )
+            )
+
+    for link in page.links:
+        if link.id not in registry:
+            findings.append(
+                Finding(
+                    "error",
+                    "link.unknown",
+                    f"links id {link.id!r} not in registry",
+                    page.path,
+                )
+            )
+    if page.canonical and page.canonical not in registry:
+        findings.append(
+            Finding(
+                "error",
+                "canonical.unknown",
+                f"canonical id {page.canonical!r} not in registry",
+                page.path,
+            )
+        )
+
+    for _label, target in _MD_LINK.findall(split.body if split.frontmatter else text):
+        if target.startswith(("http://", "https://", "mailto:", "#")):
+            continue
+        href = target.split("#", 1)[0]
+        if not href:
+            continue
+        resolved = (abs_path.parent / href).resolve()
+        try:
+            resolved.relative_to(root.resolve())
+        except ValueError:
+            findings.append(
+                Finding("error", "link.escape", f"link escapes repo: {target}", page.path)
+            )
+            continue
+        if not resolved.exists():
+            findings.append(Finding("error", "link.broken", f"broken link: {target}", page.path))
+    return findings
+
+
+def _coverage_files(root: Path, scope_dir: Path, doc: SpecDocument) -> set[str]:
+    found: set[str] = set()
+    base = root / scope_dir
+    for block in doc.coverage.source + doc.coverage.features:
+        for pattern in block.paths:
+            if any(char in pattern for char in "*?["):
+                for match in base.glob(pattern):
+                    if match.is_file():
+                        found.add(match.relative_to(root).as_posix())
+            else:
+                candidate = base / pattern
+                if candidate.is_file():
+                    found.add(candidate.relative_to(root).as_posix())
+    return found
+
+
+def _git_candidates(root: Path, coverage_files: set[str]) -> list[str]:
+    if not coverage_files:
+        return []
+    changed = _git_changed_files(root)
+    return sorted(path for path in changed if path in coverage_files)
+
+
+def _git_changed_files(root: Path) -> set[str]:
+    commands = (
+        ["git", "-C", os.fspath(root), "diff", "--name-only", "HEAD"],
+        ["git", "-C", os.fspath(root), "diff", "--name-only", "--cached"],
+        ["git", "-C", os.fspath(root), "ls-files", "--others", "--exclude-standard"],
+    )
+    found: set[str] = set()
+    for command in commands:
+        try:
+            completed = subprocess.run(
+                command,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except (FileNotFoundError, subprocess.CalledProcessError):
+            continue
+        for line in completed.stdout.splitlines():
+            path = line.strip()
+            if path:
+                found.add(path)
+    return found
