@@ -84,10 +84,16 @@ class SiteCmdTests:
                 if call.args and call.args[0] and call.args[0][0] == "zensical"
             ]
             assert len(engine_calls) == 1
-            assert engine_calls[0].args[0] == ["zensical", "build", "-f", "mkdocs.yml"]
+            assert engine_calls[0].args[0] == [
+                "zensical",
+                "build",
+                "-f",
+                ".codoc-engine.yml",
+            ]
             assert os.path.samefile(engine_calls[0].kwargs["cwd"], repo)
             assert result.site_dir.as_posix() == "site"
-            assert (repo / "mkdocs.yml").is_file()
+            assert (repo / ".codoc-engine.yml").is_file()
+            assert not (repo / "mkdocs.yml").exists()
 
     def test_build_missing_binary(self) -> None:
         with _git_repo() as repo:
@@ -117,7 +123,12 @@ class SiteCmdTests:
                 if call.args and call.args[0] and call.args[0][0] == "mkdocs"
             ]
             assert len(engine_calls) == 1
-            assert engine_calls[0].args[0] == ["mkdocs", "build", "-f", "mkdocs.yml"]
+            assert engine_calls[0].args[0] == [
+                "mkdocs",
+                "build",
+                "-f",
+                ".codoc-engine.yml",
+            ]
 
     def test_serve_writes_pidfile_and_log(self) -> None:
         with _git_repo() as repo:
@@ -137,7 +148,12 @@ class SiteCmdTests:
                 if call.args and call.args[0] and call.args[0][0] == "zensical"
             ]
             assert len(engine_calls) == 1
-            assert engine_calls[0].args[0] == ["zensical", "serve", "-f", "mkdocs.yml"]
+            assert engine_calls[0].args[0] == [
+                "zensical",
+                "serve",
+                "-f",
+                ".codoc-engine.yml",
+            ]
             assert os.path.samefile(engine_calls[0].kwargs["cwd"], repo)
             assert engine_calls[0].kwargs["start_new_session"]
             assert result.pid == 4242

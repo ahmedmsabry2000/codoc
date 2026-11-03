@@ -55,7 +55,8 @@ class CleanCmdTests:
         with _git_repo() as repo:
             run_init(repo)
             _touch(repo / "site" / "index.html")
-            _touch(repo / "mkdocs.yml", "# Generated\n")
+            _touch(repo / ".codoc-engine.yml", "# Generated\n")
+            _touch(repo / "mkdocs.yml", "# legacy\n")
             _touch(repo / ".codoc" / "generated" / ".vale.ini")
             _touch(repo / ".codoc" / "cache" / "x")
             _touch(repo / ".codoc" / "logs" / "serve.log")
@@ -64,6 +65,7 @@ class CleanCmdTests:
                 result = run_clean(repo)
             assert not result.stopped_serve
             assert not (repo / "site").exists()
+            assert not (repo / ".codoc-engine.yml").exists()
             assert not (repo / "mkdocs.yml").exists()
             assert not (repo / ".codoc" / "generated").exists()
             assert not (repo / ".codoc" / "cache").exists()
@@ -71,6 +73,7 @@ class CleanCmdTests:
             assert (repo / ".codoc" / "scripts" / "keep.py").is_file()
             assert (repo / ".codoc" / "scripts" / ".gitkeep").is_file()
             assert Path("site") in result.removed
+            assert Path(".codoc-engine.yml") in result.removed
             assert Path("mkdocs.yml") in result.removed
 
     def test_clean_uses_configured_site_dir(self) -> None:
@@ -102,11 +105,11 @@ class CleanCmdTests:
         with _git_repo() as repo:
             run_init(repo)
             _touch(repo / "site" / "index.html")
-            _touch(repo / "mkdocs.yml")
+            _touch(repo / ".codoc-engine.yml")
             with patch("codoc.commands.clean.stop_serve", return_value=True):
                 out, err, code = _run_in(repo, ["clean"])
         assert code is None
         assert err == ""
         assert "stopped\tserve\n" in out
-        assert "mkdocs.yml\n" in out
+        assert ".codoc-engine.yml\n" in out
         assert "site\n" in out

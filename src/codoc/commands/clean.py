@@ -7,8 +7,9 @@ from pathlib import Path
 from codoc.commands.site import stop_serve
 from codoc.config import ConfigError, load_project_config
 from codoc.discover import DiscoverError, git_root
+from codoc.engine.codegen import ENGINE_SHIM
 
-_ENGINE_FILE = Path("mkdocs.yml")
+_LEGACY_ENGINE_FILE = Path("mkdocs.yml")
 _GENERATED_DIR = Path(".codoc") / "generated"
 _RUNTIME_DIRS = (
     Path(".codoc") / "cache",
@@ -50,7 +51,14 @@ def run_clean(start: Path | None = None) -> CleanResult:
 
     stopped = stop_serve(root)
     removed: list[Path] = []
-    for rel in (site_dir, _ENGINE_FILE, _GENERATED_DIR, *_RUNTIME_DIRS, _PID_FILE):
+    for rel in (
+        site_dir,
+        ENGINE_SHIM,
+        _LEGACY_ENGINE_FILE,
+        _GENERATED_DIR,
+        *_RUNTIME_DIRS,
+        _PID_FILE,
+    ):
         if _remove(root / rel):
             removed.append(rel)
     ordered = tuple(sorted(set(removed), key=lambda path: path.as_posix()))
