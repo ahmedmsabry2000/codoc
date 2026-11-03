@@ -1,7 +1,7 @@
 """Emit an auto-generated overview of the Codoc package tree."""
 
-from pathlib import Path
 import os
+from pathlib import Path
 
 root = Path(os.environ["CODOC_ROOT"])
 scope = Path(os.environ["CODOC_SCOPE_DIR"])
