@@ -3,13 +3,14 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from codoc.config import ConfigError, load_project_config
+from codoc.config import ConfigError, LlmConfig, load_project_config
 from codoc.discover import DiscoverError, SpecUnit, discover, git_root
+from codoc.generate.draft import draft_stub_body
 from codoc.generate.ensure import PageOutcome, ensure_page
 from codoc.generate.frontmatter import FrontmatterError
 from codoc.generate.scripts import ScriptError
 from codoc.model.registry import build_page_registry
-from codoc.model.spec import CoverageBlock, SpecDocument, SpecError, load_spec
+from codoc.model.spec import CoverageBlock, Page, SpecDocument, SpecError, load_spec
 
 
 class GenerateError(Exception):
@@ -20,6 +21,7 @@ class GenerateError(Exception):
 class GenerateResult:
     root: Path
     pages: tuple[PageOutcome, ...]
+    notes: tuple[str, ...] = ()
 
 
 def run_generate(start: Path | None = None) -> GenerateResult:
@@ -35,9 +37,13 @@ def run_generate(start: Path | None = None) -> GenerateResult:
             loaded.append((unit, load_spec(root / unit.spec_path)))
         registry = build_page_registry(tuple((root / unit.spec_path, doc) for unit, doc in loaded))
         outcomes: list[PageOutcome] = []
+        notes: list[str] = []
         for unit, doc in loaded:
             sources_by_page = _sources_by_page(root, unit.scope_dir, doc)
             for page in doc.pages():
+                draft, note = _maybe_draft(root, page, config.llm)
+                if note and note not in notes:
+                    notes.append(note)
                 outcomes.append(
                     ensure_page(
                         root=root,
@@ -46,11 +52,25 @@ def run_generate(start: Path | None = None) -> GenerateResult:
                         registry=registry,
                         source_paths=sources_by_page.get(page.id, ()),
                         scripts_dir=config.paths.scripts_dir,
+                        draft_body=draft,
                     )
                 )
     except (DiscoverError, ConfigError, SpecError, ScriptError, FrontmatterError) as err:
         raise GenerateError(str(err)) from err
-    return GenerateResult(root=root, pages=tuple(outcomes))
+    return GenerateResult(root=root, pages=tuple(outcomes), notes=tuple(notes))
+
+
+def _maybe_draft(
+    root: Path,
+    page: Page,
+    llm: LlmConfig,
+) -> tuple[str | None, str | None]:
+    """Draft only when creating a new manual/hybrid page."""
+    if page.type not in {"manual", "hybrid"}:
+        return None, None
+    if (root / page.path).is_file():
+        return None, None
+    return draft_stub_body(page, llm)
 
 
 def _sources_by_page(

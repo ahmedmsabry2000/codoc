@@ -57,6 +57,6 @@ uv run codoc build
 uv run codoc serve
 ```
 
-Sibling demo: `../codoc-example`.
+Sibling demo: [codoc-example](https://github.com/ahmedmsabry2000/codoc-example) (`../codoc-example` locally).
 
 `uv run python -m codoc` calls the same entry point as `uv run codoc`.
