@@ -35,11 +35,11 @@ codoc:
   - path: src/codoc/rag/index.py
 ---
 
-# Codoc package overview
+# Codoc overview
 
 Scope `src/codoc`.
 
-Top-level modules and packages:
+Top-level modules:
 
 - `cli/`
 - `commands/`

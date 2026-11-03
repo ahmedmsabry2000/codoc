@@ -4,7 +4,7 @@ engine:
   site_dir: site
   site_name: Codoc
 vale:
-  enabled: false
+  enabled: true
 paths:
   scripts_dir: .codoc/scripts
 terms:
@@ -12,3 +12,12 @@ terms:
   - Zensical
   - Vale
   - BYO
+  - FastAPI
+  - Hugging
+  - MkDocs
+  - OpenAI
+  - Anthropic
+  - Ollama
+  - pipx
+  - pytest
+  - uv

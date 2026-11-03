@@ -112,7 +112,14 @@ class LintCmdTests:
             assert "FooBar" in learned
             assert "parse_spec" in learned
             accept = (
-                repo / ".codoc" / "generated" / "styles" / "Vocab" / "Codoc" / "accept.txt"
+                repo
+                / ".codoc"
+                / "generated"
+                / "styles"
+                / "config"
+                / "vocabularies"
+                / "Codoc"
+                / "accept.txt"
             ).read_text(encoding="utf-8")
             assert "FooBar" in accept
             assert "parse_spec" in accept
@@ -138,7 +145,14 @@ class LintCmdTests:
             assert "learned" not in err
             assert not (repo / ".codoc" / "vocab" / "learned.txt").exists()
             accept = (
-                repo / ".codoc" / "generated" / "styles" / "Vocab" / "Codoc" / "accept.txt"
+                repo
+                / ".codoc"
+                / "generated"
+                / "styles"
+                / "config"
+                / "vocabularies"
+                / "Codoc"
+                / "accept.txt"
             ).read_text(encoding="utf-8")
             assert "BrandNewTool" not in accept
 
