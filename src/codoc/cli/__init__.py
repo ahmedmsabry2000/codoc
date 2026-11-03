@@ -188,6 +188,8 @@ def _run_recommend() -> None:
     except RecommendError as err:
         print(f"codoc recommend: {err}", file=sys.stderr)
         raise SystemExit(1) from err
+    for note in result.notes:
+        print(f"codoc recommend: {note}", file=sys.stderr)
     print("scope_dir\trationale")
     for row in result.rows:
         print(f"{row.scope_dir.as_posix()}\t{row.rationale}")

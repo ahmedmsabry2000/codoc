@@ -1,0 +1,163 @@
+"""Minimal chat-completions client using the standard library."""
+
+import json
+import os
+import urllib.error
+import urllib.request
+from typing import Any
+
+
+class LlmError(Exception):
+    """A BYO LLM call failed."""
+
+
+def resolve_api_key(provider: str) -> str | None:
+    """Return an API key from the environment for the configured provider."""
+    name = provider.lower()
+    if name in {"openai", "openai-compatible"}:
+        return os.environ.get("OPENAI_API_KEY") or None
+    if name == "anthropic":
+        return os.environ.get("ANTHROPIC_API_KEY") or None
+    return None
+
+
+def chat_completion(
+    *,
+    provider: str,
+    model: str,
+    api_key: str,
+    messages: list[dict[str, str]],
+    timeout_s: float = 30.0,
+) -> str:
+    """
+    Return the assistant text for a short chat request.
+
+    Supports openai, openai-compatible (OPENAI_BASE_URL), and anthropic.
+    """
+    name = provider.lower()
+    if name in {"openai", "openai-compatible"}:
+        return _openai_chat(
+            model=model,
+            api_key=api_key,
+            messages=messages,
+            base_url=_openai_base_url(),
+            timeout_s=timeout_s,
+        )
+    if name == "anthropic":
+        return _anthropic_chat(
+            model=model,
+            api_key=api_key,
+            messages=messages,
+            timeout_s=timeout_s,
+        )
+    raise LlmError(f"unsupported llm.provider {provider!r}")
+
+
+def _openai_base_url() -> str:
+    raw = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
+    return raw
+
+
+def _openai_chat(
+    *,
+    model: str,
+    api_key: str,
+    messages: list[dict[str, str]],
+    base_url: str,
+    timeout_s: float,
+) -> str:
+    payload = {"model": model, "messages": messages, "temperature": 0}
+    data = _post_json(
+        f"{base_url}/chat/completions",
+        payload,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        timeout_s=timeout_s,
+    )
+    try:
+        content = data["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError) as err:
+        raise LlmError("openai response missing message content") from err
+    if not isinstance(content, str) or content == "":
+        raise LlmError("openai response content empty")
+    return content
+
+
+def _anthropic_chat(
+    *,
+    model: str,
+    api_key: str,
+    messages: list[dict[str, str]],
+    timeout_s: float,
+) -> str:
+    system = ""
+    converted: list[dict[str, Any]] = []
+    for message in messages:
+        role = message.get("role", "")
+        content = message.get("content", "")
+        if role == "system":
+            system = content
+            continue
+        if role not in {"user", "assistant"}:
+            continue
+        converted.append({"role": role, "content": content})
+    if not converted:
+        raise LlmError("anthropic requires at least one user message")
+    payload: dict[str, Any] = {
+        "model": model,
+        "max_tokens": 1024,
+        "messages": converted,
+        "temperature": 0,
+    }
+    if system:
+        payload["system"] = system
+    data = _post_json(
+        "https://api.anthropic.com/v1/messages",
+        payload,
+        headers={
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json",
+        },
+        timeout_s=timeout_s,
+    )
+    try:
+        blocks = data["content"]
+        text = "".join(
+            block.get("text", "")
+            for block in blocks
+            if isinstance(block, dict) and block.get("type") == "text"
+        )
+    except (KeyError, TypeError) as err:
+        raise LlmError("anthropic response missing text content") from err
+    if text == "":
+        raise LlmError("anthropic response content empty")
+    return text
+
+
+def _post_json(
+    url: str,
+    payload: dict[str, Any],
+    *,
+    headers: dict[str, str],
+    timeout_s: float,
+) -> dict[str, Any]:
+    body = json.dumps(payload).encode("utf-8")
+    request = urllib.request.Request(url, data=body, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(request, timeout=timeout_s) as response:
+            raw = response.read().decode("utf-8")
+    except urllib.error.HTTPError as err:
+        detail = err.read().decode("utf-8", errors="replace")
+        raise LlmError(f"llm HTTP {err.code}: {detail[:200]}") from err
+    except urllib.error.URLError as err:
+        raise LlmError(f"llm request failed: {err.reason}") from err
+    try:
+        loaded = json.loads(raw)
+    except json.JSONDecodeError as err:
+        raise LlmError("llm response is not JSON") from err
+    if not isinstance(loaded, dict):
+        raise LlmError("llm response must be a JSON object")
+    return loaded
