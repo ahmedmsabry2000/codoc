@@ -23,6 +23,16 @@ codoc:
   - path: src/codoc/engine/vocab.py
   - path: src/codoc/generate/__init__.py
   - path: src/codoc/generate/ensure.py
+  - path: src/codoc/generate/frontmatter.py
+  - path: src/codoc/generate/links.py
+  - path: src/codoc/generate/scripts.py
+  - path: src/codoc/llm/__init__.py
+  - path: src/codoc/llm/chat.py
+  - path: src/codoc/model/__init__.py
+  - path: src/codoc/model/registry.py
+  - path: src/codoc/model/spec.py
+  - path: src/codoc/rag/__init__.py
+  - path: src/codoc/rag/index.py
 ---
 
 # Codoc package overview
@@ -84,6 +94,26 @@ Top-level modules and packages:
 - [`__init__.py`](../../src/codoc/generate/__init__.py)
 
 - [`ensure.py`](../../src/codoc/generate/ensure.py)
+
+- [`frontmatter.py`](../../src/codoc/generate/frontmatter.py)
+
+- [`links.py`](../../src/codoc/generate/links.py)
+
+- [`scripts.py`](../../src/codoc/generate/scripts.py)
+
+- [`__init__.py`](../../src/codoc/llm/__init__.py)
+
+- [`chat.py`](../../src/codoc/llm/chat.py)
+
+- [`__init__.py`](../../src/codoc/model/__init__.py)
+
+- [`registry.py`](../../src/codoc/model/registry.py)
+
+- [`spec.py`](../../src/codoc/model/spec.py)
+
+- [`__init__.py`](../../src/codoc/rag/__init__.py)
+
+- [`index.py`](../../src/codoc/rag/index.py)
 
 ## Original page
 

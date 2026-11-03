@@ -6,6 +6,10 @@ from pathlib import Path
 import yaml
 
 
+class FrontmatterError(Exception):
+    """Frontmatter could not be parsed or written."""
+
+
 @dataclass(frozen=True, slots=True)
 class SourceRef:
     path: str
@@ -22,38 +26,38 @@ class CodocFrontmatter:
 class SplitDoc:
     frontmatter: CodocFrontmatter | None
     body: str
-    raw_frontmatter: str | None = None
+    mapping: dict | None = None
 
 
 def split_frontmatter(text: str) -> SplitDoc:
     """Split a Markdown file into optional codoc frontmatter and body."""
     if not text.startswith("---"):
-        return SplitDoc(frontmatter=None, body=text, raw_frontmatter=None)
+        return SplitDoc(frontmatter=None, body=text, mapping=None)
     lines = text.splitlines(keepends=True)
     if not lines or lines[0].strip() != "---":
-        return SplitDoc(frontmatter=None, body=text, raw_frontmatter=None)
+        return SplitDoc(frontmatter=None, body=text, mapping=None)
     end = None
     for index, line in enumerate(lines[1:], start=1):
         if line.strip() == "---":
             end = index
             break
     if end is None:
-        return SplitDoc(frontmatter=None, body=text, raw_frontmatter=None)
+        return SplitDoc(frontmatter=None, body=text, mapping=None)
     raw = "".join(lines[1:end])
     body = "".join(lines[end + 1 :])
     try:
         loaded = yaml.safe_load(raw) or {}
-    except yaml.YAMLError:
-        return SplitDoc(frontmatter=None, body=text, raw_frontmatter=None)
+    except yaml.YAMLError as err:
+        raise FrontmatterError(f"invalid frontmatter YAML: {err}") from err
     if not isinstance(loaded, dict):
-        return SplitDoc(frontmatter=None, body=text, raw_frontmatter=None)
+        raise FrontmatterError("frontmatter must be a mapping")
     block = loaded.get("codoc")
     if not isinstance(block, dict):
-        return SplitDoc(frontmatter=None, body=body, raw_frontmatter=raw)
+        return SplitDoc(frontmatter=None, body=body, mapping=loaded)
     page_id = block.get("id")
     page_type = block.get("type")
     if not isinstance(page_id, str) or not isinstance(page_type, str):
-        return SplitDoc(frontmatter=None, body=body, raw_frontmatter=raw)
+        return SplitDoc(frontmatter=None, body=body, mapping=loaded)
     sources: list[SourceRef] = []
     raw_sources = block.get("sources") or []
     if isinstance(raw_sources, list):
@@ -63,31 +67,37 @@ def split_frontmatter(text: str) -> SplitDoc:
     return SplitDoc(
         frontmatter=CodocFrontmatter(page_id, page_type, tuple(sources)),
         body=body,
-        raw_frontmatter=raw,
+        mapping=loaded,
     )
 
 
-def render_frontmatter(meta: CodocFrontmatter) -> str:
-    """Return a `---` fenced YAML block for the codoc mirror."""
-    payload: dict = {
-        "codoc": {
-            "id": meta.id,
-            "type": meta.type,
-        }
+def render_frontmatter(meta: CodocFrontmatter, *, existing: dict | None = None) -> str:
+    """Return a `---` fenced YAML block, keeping non-codoc keys from existing."""
+    payload: dict = dict(existing) if existing else {}
+    block: dict = {
+        "id": meta.id,
+        "type": meta.type,
     }
     if meta.sources:
-        payload["codoc"]["sources"] = [{"path": source.path} for source in meta.sources]
+        block["sources"] = [{"path": source.path} for source in meta.sources]
+    payload["codoc"] = block
     dumped = yaml.safe_dump(payload, sort_keys=False, allow_unicode=True).rstrip()
     return f"---\n{dumped}\n---\n"
 
 
-def write_doc(path: Path, meta: CodocFrontmatter, body: str) -> None:
+def write_doc(
+    path: Path,
+    meta: CodocFrontmatter,
+    body: str,
+    *,
+    existing: dict | None = None,
+) -> None:
     """Write frontmatter + body to path, creating parents as needed."""
     path.parent.mkdir(parents=True, exist_ok=True)
     body_text = body.lstrip("\n")
     if body_text and not body_text.endswith("\n"):
         body_text += "\n"
-    content = render_frontmatter(meta)
+    content = render_frontmatter(meta, existing=existing)
     if body_text:
         content += "\n" + body_text
     path.write_text(content, encoding="utf-8")
