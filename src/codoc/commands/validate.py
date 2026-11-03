@@ -15,7 +15,9 @@ from codoc.model.spec import Page, SpecDocument, SpecError, load_spec
 from codoc.rag.index import build_rag_index, retrieve, write_rag_index
 
 _MD_LINK = re.compile(r"(?<!!)\[([^\]]*)\]\(([^)]+)\)")
-_FENCE_OPEN = re.compile(r"^(`{3,}|~{3,})")
+# CommonMark: fences may indent 0–3 spaces; closers are marker-only (no info string).
+_FENCE_OPEN = re.compile(r"^( {0,3})(`{3,}|~{3,})(.*)$")
+_FENCE_CLOSE = re.compile(r"^( {0,3})(`{3,}|~{3,})[ \t]*$")
 
 
 class ValidateError(Exception):
@@ -249,25 +251,38 @@ def _without_fenced_code(text: str) -> str:
     """Drop closed fenced code blocks so sample links inside them are not checked.
 
     An unclosed fence is treated as prose so later real links are still checked.
+    Nested sample fences with an info string do not close the outer fence.
     """
     lines = text.splitlines(keepends=True)
     kept: list[str] = []
     pending: list[str] = []
-    fence: str | None = None
+    fence_char: str | None = None
+    fence_len = 0
     for line in lines:
-        if fence is None:
-            match = _FENCE_OPEN.match(line.strip())
+        raw = line[:-1] if line.endswith("\n") else line
+        if raw.endswith("\r"):
+            raw = raw[:-1]
+        if fence_char is None:
+            match = _FENCE_OPEN.match(raw)
             if match:
-                fence = match.group(1)[0] * len(match.group(1))
+                marker = match.group(2)
+                fence_char = marker[0]
+                fence_len = len(marker)
                 pending = [line]
                 continue
             kept.append(line)
             continue
         pending.append(line)
-        if line.strip().startswith(fence):
-            fence = None
+        close = _FENCE_CLOSE.match(raw)
+        if (
+            close is not None
+            and close.group(2)[0] == fence_char
+            and len(close.group(2)) >= fence_len
+        ):
+            fence_char = None
+            fence_len = 0
             pending = []
-    if fence is not None:
+    if fence_char is not None:
         kept.extend(pending)
     return "".join(kept)
 
