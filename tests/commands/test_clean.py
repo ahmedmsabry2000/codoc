@@ -1,16 +1,17 @@
 import io
 import os
 import subprocess
-import unittest
 from collections.abc import Iterator
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 import codoc.cli as cli
 from codoc.commands.clean import CleanError, run_clean
 from codoc.commands.init import run_init
-from tests.tmpdir import temporary_directory
+from tests.support.tmpdir import temporary_directory
 
 
 @contextmanager
@@ -49,7 +50,7 @@ def _touch(path: Path, text: str = "x") -> None:
     path.write_text(text, encoding="utf-8")
 
 
-class CleanCmdTests(unittest.TestCase):
+class CleanCmdTests:
     def test_clean_removes_generated_keeps_scripts(self) -> None:
         with _git_repo() as repo:
             run_init(repo)
@@ -61,16 +62,16 @@ class CleanCmdTests(unittest.TestCase):
             _touch(repo / ".codoc" / "scripts" / "keep.py", "print(1)\n")
             with patch("codoc.commands.clean.stop_serve", return_value=False):
                 result = run_clean(repo)
-            self.assertFalse(result.stopped_serve)
-            self.assertFalse((repo / "site").exists())
-            self.assertFalse((repo / "mkdocs.yml").exists())
-            self.assertFalse((repo / ".codoc" / "generated").exists())
-            self.assertFalse((repo / ".codoc" / "cache").exists())
-            self.assertFalse((repo / ".codoc" / "logs").exists())
-            self.assertTrue((repo / ".codoc" / "scripts" / "keep.py").is_file())
-            self.assertTrue((repo / ".codoc" / "scripts" / ".gitkeep").is_file())
-            self.assertIn(Path("site"), result.removed)
-            self.assertIn(Path("mkdocs.yml"), result.removed)
+            assert not result.stopped_serve
+            assert not (repo / "site").exists()
+            assert not (repo / "mkdocs.yml").exists()
+            assert not (repo / ".codoc" / "generated").exists()
+            assert not (repo / ".codoc" / "cache").exists()
+            assert not (repo / ".codoc" / "logs").exists()
+            assert (repo / ".codoc" / "scripts" / "keep.py").is_file()
+            assert (repo / ".codoc" / "scripts" / ".gitkeep").is_file()
+            assert Path("site") in result.removed
+            assert Path("mkdocs.yml") in result.removed
 
     def test_clean_uses_configured_site_dir(self) -> None:
         with _git_repo() as repo:
@@ -81,8 +82,8 @@ class CleanCmdTests(unittest.TestCase):
             _touch(repo / "out" / "html" / "index.html")
             with patch("codoc.commands.clean.stop_serve", return_value=False):
                 result = run_clean(repo)
-            self.assertFalse((repo / "out" / "html").exists())
-            self.assertIn(Path("out/html"), result.removed)
+            assert not (repo / "out" / "html").exists()
+            assert Path("out/html") in result.removed
 
     def test_clean_stops_serve(self) -> None:
         with _git_repo() as repo:
@@ -90,11 +91,11 @@ class CleanCmdTests(unittest.TestCase):
             with patch("codoc.commands.clean.stop_serve", return_value=True) as stop:
                 result = run_clean(repo)
             stop.assert_called_once()
-            self.assertTrue(os.path.samefile(stop.call_args.args[0], repo))
-            self.assertTrue(result.stopped_serve)
+            assert os.path.samefile(stop.call_args.args[0], repo)
+            assert result.stopped_serve
 
     def test_clean_outside_repo_raises(self) -> None:
-        with temporary_directory() as root, self.assertRaises(CleanError):
+        with temporary_directory() as root, pytest.raises(CleanError):
             run_clean(root)
 
     def test_cli_clean_prints_removed_paths(self) -> None:
@@ -104,12 +105,8 @@ class CleanCmdTests(unittest.TestCase):
             _touch(repo / "mkdocs.yml")
             with patch("codoc.commands.clean.stop_serve", return_value=True):
                 out, err, code = _run_in(repo, ["clean"])
-        self.assertEqual(code, None)
-        self.assertEqual(err, "")
-        self.assertIn("stopped\tserve\n", out)
-        self.assertIn("mkdocs.yml\n", out)
-        self.assertIn("site\n", out)
-
-
-if __name__ == "__main__":
-    unittest.main()
+        assert code is None
+        assert err == ""
+        assert "stopped\tserve\n" in out
+        assert "mkdocs.yml\n" in out
+        assert "site\n" in out

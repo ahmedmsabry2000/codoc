@@ -1,10 +1,11 @@
 import os
 import subprocess
-import unittest
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 from codoc.config import ConfigError
 from codoc.discover import (
@@ -15,7 +16,7 @@ from codoc.discover import (
     discover,
     git_root,
 )
-from tests.tmpdir import temporary_directory
+from tests.support.tmpdir import temporary_directory
 
 
 def _write(path: Path, text: str = "") -> None:
@@ -44,70 +45,58 @@ def _product_tree(repo: Path) -> None:
     _write(repo / "src" / "my_project" / "cli" / "codoc.spec.yaml")
 
 
-class DiscoverTests(unittest.TestCase):
+class DiscoverTests:
     def test_missing_git_repo(self) -> None:
         with temporary_directory() as raw:
             start = Path(raw)
-            with self.assertRaises(DiscoverError) as caught:
+            with pytest.raises(DiscoverError) as caught:
                 discover(start)
-        self.assertEqual(str(caught.exception), f"not a git repository at {start}")
+        assert str(caught.value) == f"not a git repository at {start}"
 
     def test_git_not_on_path(self) -> None:
         with temporary_directory() as raw:
             start = Path(raw)
             with (
                 patch.dict(os.environ, {"PATH": str(start)}),
-                self.assertRaises(DiscoverError) as caught,
+                pytest.raises(DiscoverError) as caught,
             ):
                 discover(start)
-        self.assertEqual(str(caught.exception), "git not on PATH")
+        assert str(caught.value) == "git not on PATH"
 
     def test_missing_codoc_yaml(self) -> None:
         with _git_repo() as repo:
-            with self.assertRaises(DiscoverError) as caught:
+            with pytest.raises(DiscoverError) as caught:
                 discover(repo)
             root = git_root(repo)
-        self.assertEqual(
-            str(caught.exception),
-            f"codoc.yaml not found at {root / 'codoc.yaml'}",
-        )
+        assert str(caught.value) == f"codoc.yaml not found at {root / 'codoc.yaml'}"
 
     def test_codoc_yaml_directory_is_not_a_file(self) -> None:
         with _git_repo() as repo:
             (repo / "codoc.yaml").mkdir()
-            with self.assertRaises(DiscoverError) as caught:
+            with pytest.raises(DiscoverError) as caught:
                 discover(repo)
             root = git_root(repo)
-        self.assertEqual(
-            str(caught.exception),
-            f"codoc.yaml not found at {root / 'codoc.yaml'}",
-        )
+        assert str(caught.value) == f"codoc.yaml not found at {root / 'codoc.yaml'}"
 
     def test_lists_product_tree_and_nearest_children(self) -> None:
         with _git_repo() as repo:
             _product_tree(repo)
             units = discover(repo)
-        self.assertEqual(
-            tuple((unit.spec_path.as_posix(), unit.scope_dir.as_posix()) for unit in units),
-            (
-                ("codoc.spec.yaml", "."),
-                ("src/my_project/api/codoc.spec.yaml", "src/my_project/api"),
-                ("src/my_project/cli/codoc.spec.yaml", "src/my_project/cli"),
-                ("src/my_project/codoc.spec.yaml", "src/my_project"),
+        assert tuple((unit.spec_path.as_posix(), unit.scope_dir.as_posix()) for unit in units) == (
+            ("codoc.spec.yaml", "."),
+            ("src/my_project/api/codoc.spec.yaml", "src/my_project/api"),
+            ("src/my_project/cli/codoc.spec.yaml", "src/my_project/cli"),
+            ("src/my_project/codoc.spec.yaml", "src/my_project"),
+        )
+        assert child_scopes(units) == {
+            Path("."): (Path("src/my_project"),),
+            Path("src/my_project/api"): (),
+            Path("src/my_project/cli"): (),
+            Path("src/my_project"): (
+                Path("src/my_project/api"),
+                Path("src/my_project/cli"),
             ),
-        )
-        self.assertEqual(
-            child_scopes(units),
-            {
-                Path("."): (Path("src/my_project"),),
-                Path("src/my_project/api"): (),
-                Path("src/my_project/cli"): (),
-                Path("src/my_project"): (
-                    Path("src/my_project/api"),
-                    Path("src/my_project/cli"),
-                ),
-            },
-        )
+        }
 
     def test_child_scopes_nearest_descendant_only(self) -> None:
         units = (
@@ -119,31 +108,25 @@ class DiscoverTests(unittest.TestCase):
             ),
         )
         found = child_scopes(units)
-        self.assertEqual(
-            found,
-            {
-                Path("src/pkg"): (Path("src/pkg/api"),),
-                Path("src/pkg/api"): (Path("src/pkg/api/handlers"),),
-                Path("src/pkg/api/handlers"): (),
-            },
-        )
-        self.assertEqual(list(found), [unit.scope_dir for unit in units])
+        assert found == {
+            Path("src/pkg"): (Path("src/pkg/api"),),
+            Path("src/pkg/api"): (Path("src/pkg/api/handlers"),),
+            Path("src/pkg/api/handlers"): (),
+        }
+        assert list(found) == [unit.scope_dir for unit in units]
 
     def test_child_scopes_ignores_prefix_siblings(self) -> None:
         units = (
             SpecUnit(Path("src/pkg/codoc.spec.yaml"), Path("src/pkg")),
             SpecUnit(Path("src/pkg2/codoc.spec.yaml"), Path("src/pkg2")),
         )
-        self.assertEqual(
-            child_scopes(units),
-            {Path("src/pkg"): (), Path("src/pkg2"): ()},
-        )
+        assert child_scopes(units) == {Path("src/pkg"): (), Path("src/pkg2"): ()}
 
     def test_child_scopes_rejects_duplicate_scope(self) -> None:
         unit = SpecUnit(Path("src/pkg/codoc.spec.yaml"), Path("src/pkg"))
-        with self.assertRaises(ValueError) as caught:
+        with pytest.raises(ValueError) as caught:
             child_scopes((unit, unit))
-        self.assertEqual(str(caught.exception), "duplicate scope_dir")
+        assert str(caught.value) == "duplicate scope_dir"
 
     def test_skip_dirs_hide_specs(self) -> None:
         with _git_repo() as repo:
@@ -155,9 +138,9 @@ class DiscoverTests(unittest.TestCase):
             _write(repo / "src" / "pkg" / "__pycache__" / "codoc.spec.yaml")
             _write(repo / "nested" / "site" / "codoc.spec.yaml")
             units = discover(repo)
-        self.assertEqual(
-            tuple(unit.spec_path.as_posix() for unit in units),
-            ("keep/codoc.spec.yaml", "src/pkg/codoc.spec.yaml"),
+        assert tuple(unit.spec_path.as_posix() for unit in units) == (
+            "keep/codoc.spec.yaml",
+            "src/pkg/codoc.spec.yaml",
         )
 
     def test_ignore_unions_with_default_skip(self) -> None:
@@ -170,24 +153,21 @@ class DiscoverTests(unittest.TestCase):
             _write(repo / ".git" / "codoc.spec.yaml")
             _write(repo / "src" / "distfiles" / "codoc.spec.yaml")
             units = discover(repo)
-        self.assertEqual(set(DEFAULT_SKIP), before)
-        self.assertNotIn("node_modules", DEFAULT_SKIP)
-        self.assertEqual(
-            tuple(unit.spec_path.as_posix() for unit in units),
-            ("keep/codoc.spec.yaml", "src/distfiles/codoc.spec.yaml"),
+        assert set(DEFAULT_SKIP) == before
+        assert "node_modules" not in DEFAULT_SKIP
+        assert tuple(unit.spec_path.as_posix() for unit in units) == (
+            "keep/codoc.spec.yaml",
+            "src/distfiles/codoc.spec.yaml",
         )
 
     def test_invalid_project_file_raises_config_error(self) -> None:
         with _git_repo() as repo:
             _write(repo / "codoc.yaml", "serve: true\n")
             _write(repo / "keep" / "codoc.spec.yaml")
-            with self.assertRaises(ConfigError) as caught:
+            with pytest.raises(ConfigError) as caught:
                 discover(repo)
             root = git_root(repo)
-        self.assertEqual(
-            str(caught.exception),
-            f"{root / 'codoc.yaml'}: document: unknown field 'serve'",
-        )
+        assert str(caught.value) == f"{root / 'codoc.yaml'}: document: unknown field 'serve'"
 
     def test_exact_spec_filename(self) -> None:
         with _git_repo() as repo:
@@ -196,60 +176,53 @@ class DiscoverTests(unittest.TestCase):
             _write(repo / "real" / "codoc.spec.yml")
             _write(repo / "other" / "Codoc.spec.yaml")
             units = discover(repo)
-        self.assertEqual(
-            tuple(unit.spec_path.as_posix() for unit in units),
-            ("real/codoc.spec.yaml",),
-        )
+        assert tuple(unit.spec_path.as_posix() for unit in units) == ("real/codoc.spec.yaml",)
 
     def test_discover_from_subdirectory_lists_the_repo(self) -> None:
         with _git_repo() as repo:
             _product_tree(repo)
             from_root = discover(repo)
             from_sub = discover(repo / "src")
-        self.assertEqual(from_sub, from_root)
-        self.assertEqual(len(from_sub), 4)
+        assert from_sub == from_root
+        assert len(from_sub) == 4
 
     def test_second_discover_matches_the_first(self) -> None:
         with _git_repo() as repo:
             _product_tree(repo)
-            self.assertEqual(discover(repo), discover(repo))
+            assert discover(repo) == discover(repo)
 
     def test_unreadable_directory(self) -> None:
         if os.geteuid() == 0:
-            self.skipTest("root can read a mode 0 directory")
+            pytest.skip("root can read a mode 0 directory")
         with _git_repo() as repo:
             _write(repo / "codoc.yaml")
             secret = repo / "secret"
             secret.mkdir()
             secret.chmod(0)
             try:
-                with self.assertRaises(DiscoverError) as caught:
+                with pytest.raises(DiscoverError) as caught:
                     discover(repo)
                 root = git_root(repo)
             finally:
                 secret.chmod(0o755)
-        self.assertIn(f"cannot read {root}, ", str(caught.exception))
+        assert f"cannot read {root}, " in str(caught.value)
 
     def test_spec_unit_rejects_illegal_paths(self) -> None:
         root = SpecUnit(Path("codoc.spec.yaml"), Path("."))
-        self.assertEqual(root.scope_dir.as_posix(), ".")
+        assert root.scope_dir.as_posix() == "."
         SpecUnit(Path("src/pkg/codoc.spec.yaml"), Path("src/pkg"))
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             SpecUnit(Path("/tmp/codoc.spec.yaml"), Path("."))
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             SpecUnit(Path("codoc.spec.yaml"), Path("/tmp"))
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             SpecUnit(Path("src/../codoc.spec.yaml"), Path("."))
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             SpecUnit(Path("src/codoc.spec.yml"), Path("src"))
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             SpecUnit(Path("src/pkg/codoc.spec.yaml"), Path("src"))
 
     def test_empty_repo_returns_no_units(self) -> None:
         with _git_repo() as repo:
             _write(repo / "codoc.yaml")
-            self.assertEqual(discover(repo), ())
-
-
-if __name__ == "__main__":
-    unittest.main()
+            assert discover(repo) == ()

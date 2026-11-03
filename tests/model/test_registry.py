@@ -1,5 +1,6 @@
-import unittest
 from pathlib import Path
+
+import pytest
 
 from codoc.model.registry import RegistryEntry, build_page_registry
 from codoc.model.spec import (
@@ -10,10 +11,10 @@ from codoc.model.spec import (
     SpecError,
     load_spec,
 )
-from tests.tmpdir import temporary_directory
+from tests.support.tmpdir import temporary_directory
 
 
-class RegistryTests(unittest.TestCase):
+class RegistryTests:
     def test_merge_lookup_returns_path_type_and_owning_spec(self) -> None:
         owning = Path("src/pkg/codoc.spec.yaml")
         other = Path("src/pkg/cli/codoc.spec.yaml")
@@ -36,30 +37,27 @@ class RegistryTests(unittest.TestCase):
             ),
         )
         registry = build_page_registry(((owning, first), (other, second)))
-        self.assertEqual(len(registry), 3)
-        self.assertEqual(
-            registry.entries,
-            (
-                RegistryEntry("cli-core.ref", "docs/cli.md", "auto-generated", other),
-                RegistryEntry("guide", "docs/guide.md", "hybrid", owning),
-                RegistryEntry("overview", "docs/overview.md", "manual", owning),
-            ),
+        assert len(registry) == 3
+        assert registry.entries == (
+            RegistryEntry("cli-core.ref", "docs/cli.md", "auto-generated", other),
+            RegistryEntry("guide", "docs/guide.md", "hybrid", owning),
+            RegistryEntry("overview", "docs/overview.md", "manual", owning),
         )
         overview = registry.lookup("overview")
-        self.assertEqual(overview.path, "docs/overview.md")
-        self.assertEqual(overview.type, "manual")
-        self.assertEqual(overview.spec_path, owning)
+        assert overview.path == "docs/overview.md"
+        assert overview.type == "manual"
+        assert overview.spec_path == owning
         guide = registry.lookup("guide")
-        self.assertEqual(guide.path, "docs/guide.md")
-        self.assertEqual(guide.type, "hybrid")
-        self.assertEqual(guide.spec_path, owning)
+        assert guide.path == "docs/guide.md"
+        assert guide.type == "hybrid"
+        assert guide.spec_path == owning
         ref = registry.lookup("cli-core.ref")
-        self.assertEqual(ref.path, "docs/cli.md")
-        self.assertEqual(ref.type, "auto-generated")
-        self.assertEqual(ref.spec_path, other)
-        self.assertIn("guide", registry)
-        self.assertNotIn("missing", registry)
-        with self.assertRaises(KeyError):
+        assert ref.path == "docs/cli.md"
+        assert ref.type == "auto-generated"
+        assert ref.spec_path == other
+        assert "guide" in registry
+        assert "missing" not in registry
+        with pytest.raises(KeyError):
             registry.lookup("missing")
 
     def test_duplicate_page_id_across_specs_fails(self) -> None:
@@ -81,22 +79,15 @@ class RegistryTests(unittest.TestCase):
             later.write_text(text)
             first = load_spec(earlier)
             second = load_spec(later)
-            with self.assertRaises(SpecError) as caught:
+            with pytest.raises(SpecError) as caught:
                 build_page_registry(((earlier, first), (later, second)))
-        self.assertEqual(caught.exception.path, later)
-        self.assertEqual(
-            caught.exception.detail,
-            f"duplicate page id 'overview' also in {earlier}",
-        )
+        assert caught.value.path == later
+        assert caught.value.detail == f"duplicate page id 'overview' also in {earlier}"
 
     def test_empty_registry(self) -> None:
         registry = build_page_registry(())
-        self.assertEqual(len(registry), 0)
-        self.assertEqual(registry.entries, ())
-        self.assertNotIn("overview", registry)
-        with self.assertRaises(KeyError):
+        assert len(registry) == 0
+        assert registry.entries == ()
+        assert "overview" not in registry
+        with pytest.raises(KeyError):
             registry.lookup("overview")
-
-
-if __name__ == "__main__":
-    unittest.main()
