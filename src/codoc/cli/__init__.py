@@ -6,6 +6,7 @@ from pathlib import Path
 from codoc.commands.clean import CleanError, run_clean
 from codoc.commands.init import InitError, run_init
 from codoc.commands.lint import LintError, run_lint
+from codoc.commands.recommend import RecommendError, run_recommend
 from codoc.commands.site import SiteError, run_build, run_serve
 from codoc.commands.status import StatusError, run_status
 
@@ -34,6 +35,10 @@ COMMANDS: tuple[Command, ...] = (
     ),
     Command("lint", "Run Vale."),
     Command("status", "List discovered specs, scope dirs, and page counts."),
+    Command(
+        "recommend",
+        "Suggest src/ packages that may need a nested codoc.spec.yaml.",
+    ),
     Command("clean", "Remove generated outputs."),
 )
 
@@ -58,6 +63,9 @@ def main(argv: list[str] | None = None) -> None:
         return
     if behavior == "status":
         _run_status()
+        return
+    if behavior == "recommend":
+        _run_recommend()
         return
     if behavior == "build":
         _run_build()
@@ -172,6 +180,19 @@ def _run_status() -> None:
     for row in result.rows:
         print(f"{row.spec_path.as_posix()}\t{row.scope_dir.as_posix()}\t{row.pages}")
     print(f"registry_pages\t{result.registry_pages}")
+
+
+def _run_recommend() -> None:
+    try:
+        result = run_recommend(Path.cwd())
+    except RecommendError as err:
+        print(f"codoc recommend: {err}", file=sys.stderr)
+        raise SystemExit(1) from err
+    for note in result.notes:
+        print(f"codoc recommend: {note}", file=sys.stderr)
+    print("scope_dir\trationale")
+    for row in result.rows:
+        print(f"{row.scope_dir.as_posix()}\t{row.rationale}")
 
 
 def _not_implemented(behavior: str) -> None:

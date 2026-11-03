@@ -47,7 +47,15 @@ class CliTests:
 
     def test_unimplemented_commands_print_not_implemented_to_stderr(self) -> None:
         for command in cli.COMMANDS:
-            if command.name in {"init", "status", "build", "serve", "lint", "clean"}:
+            if command.name in {
+                "init",
+                "status",
+                "recommend",
+                "build",
+                "serve",
+                "lint",
+                "clean",
+            }:
                 continue
             stderr = io.StringIO()
             with redirect_stderr(stderr), pytest.raises(SystemExit) as caught:
