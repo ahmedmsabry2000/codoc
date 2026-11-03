@@ -5,6 +5,6 @@ alwaysApply: true
 
 # Git branches
 
-- Use short descriptive branch names (for example `engine-shim` or `pytest-fixtures`).
+- Use short descriptive branch names (for example `engine-shim` or `recommend-heuristic`).
 - Never create branches whose names start with `cursor/`.
 - After a feature PR merges, delete the local branch and prune stale remote-tracking refs (`git branch -d <branch>`; `git fetch --prune`).
