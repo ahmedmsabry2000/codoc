@@ -16,6 +16,7 @@ codoc = "codoc.cli:main"
 [dependency-groups]
 dev = [
     "pre-commit>=4.7.0",
+    "pytest>=9.2.0",
     "ruff>=0.14",
 ]
 
@@ -43,3 +44,9 @@ known-first-party = ["codoc"]
 [tool.ruff.format]
 quote-style = "double"
 docstring-code-format = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["*Tests"]
+python_functions = ["test_*"]
