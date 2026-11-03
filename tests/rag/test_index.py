@@ -41,9 +41,11 @@ class RagIndexTests:
         assert out.is_file()
 
     def test_retrieve_matches_whole_tokens(self) -> None:
+        # "api" is a substring of "Capital". Path order would prefer the Capital
+        # chunk if retrieve still scored substrings, so this fails that regression.
         chunks = (
-            RagChunk(page_id="cap", path="docs/cap.md", heading="Capital", text="Capital city"),
-            RagChunk(page_id="api", path="docs/api.md", heading="API", text="api surface"),
+            RagChunk(page_id="cap", path="docs/a.md", heading="Capital", text="Capital city"),
+            RagChunk(page_id="api", path="docs/z.md", heading="API", text="api surface"),
         )
         hits = retrieve(chunks, "api")
-        assert hits and hits[0].page_id == "api"
+        assert [chunk.page_id for chunk in hits] == ["api"]

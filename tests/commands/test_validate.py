@@ -117,6 +117,68 @@ class ValidateTests:
         assert not result.ok
         assert any(item.code == "link.broken" for item in result.findings)
 
+    def test_nested_sample_fence_does_not_hide_later_links(self, git_repo: Path) -> None:
+        _seed(git_repo)
+        run_generate(git_repo)
+        guide = git_repo / "docs" / "guide.md"
+        guide.write_text(
+            "\n".join(
+                (
+                    "---",
+                    "codoc:",
+                    "  id: guide",
+                    "  type: manual",
+                    "---",
+                    "",
+                    "# Guide",
+                    "",
+                    "```md",
+                    "```python",
+                    "[sample](nope.md)",
+                    "```",
+                    "",
+                    "[real](missing.md)",
+                    "",
+                )
+            ),
+            encoding="utf-8",
+        )
+        result = run_validate(git_repo)
+        assert not result.ok
+        broken = [item.message for item in result.findings if item.code == "link.broken"]
+        assert any("missing.md" in message for message in broken)
+        assert not any("nope.md" in message for message in broken)
+
+    def test_indented_backticks_are_not_fences(self, git_repo: Path) -> None:
+        _seed(git_repo)
+        run_generate(git_repo)
+        guide = git_repo / "docs" / "guide.md"
+        guide.write_text(
+            "\n".join(
+                (
+                    "---",
+                    "codoc:",
+                    "  id: guide",
+                    "  type: manual",
+                    "---",
+                    "",
+                    "# Guide",
+                    "",
+                    "    ```",
+                    "    [sample](nope.md)",
+                    "",
+                    "[real](missing.md)",
+                    "",
+                )
+            ),
+            encoding="utf-8",
+        )
+        result = run_validate(git_repo)
+        assert not result.ok
+        broken = [item.message for item in result.findings if item.code == "link.broken"]
+        assert any("missing.md" in message for message in broken)
+        assert any("nope.md" in message for message in broken)
+
     def test_frontmatter_mismatch_fails(self, git_repo: Path) -> None:
         _seed(git_repo)
         run_generate(git_repo)
