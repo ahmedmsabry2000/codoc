@@ -1,0 +1,27 @@
+docs:
+  - id: index
+    type: manual
+    path: docs/index.md
+  - id: guide
+    type: hybrid
+    path: docs/guides/getting-started.md
+    placeholders:
+      - id: command-table
+        script: .codoc/scripts/inject_commands.py
+    links:
+      - id: package.overview
+        label: Package overview
+coverage:
+  source:
+    - id: package
+      type: auto-generated
+      paths:
+        - "**/*.py"
+      docs:
+        - id: package.overview
+          path: docs/reference/package.md
+          script: .codoc/scripts/gen_package_overview.py
+          canonical: guide
+          links:
+            - id: guide
+              label: Getting started

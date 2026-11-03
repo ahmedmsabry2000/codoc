@@ -3,7 +3,10 @@ venv/
 __pycache__/
 *.py[cod]
 site/
-.codoc/
+.codoc/*
+!.codoc/scripts/
+!.codoc/scripts/**
+.codoc-engine.yml
 # tempfile leftovers if TMPDIR is ever pointed at the package tree
 /src/tmp*/
 /src/codoc_*/
