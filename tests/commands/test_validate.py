@@ -89,6 +89,34 @@ class ValidateTests:
         assert result.ok
         assert not any(item.code == "link.broken" for item in result.findings)
 
+    def test_unclosed_fence_still_checks_later_links(self, git_repo: Path) -> None:
+        _seed(git_repo)
+        run_generate(git_repo)
+        guide = git_repo / "docs" / "guide.md"
+        guide.write_text(
+            "\n".join(
+                (
+                    "---",
+                    "codoc:",
+                    "  id: guide",
+                    "  type: manual",
+                    "---",
+                    "",
+                    "# Guide",
+                    "",
+                    "```md",
+                    "sample",
+                    "",
+                    "[missing](nope.md)",
+                    "",
+                )
+            ),
+            encoding="utf-8",
+        )
+        result = run_validate(git_repo)
+        assert not result.ok
+        assert any(item.code == "link.broken" for item in result.findings)
+
     def test_frontmatter_mismatch_fails(self, git_repo: Path) -> None:
         _seed(git_repo)
         run_generate(git_repo)
@@ -138,3 +166,52 @@ class ValidateTests:
         result = run_validate(git_repo)
         assert result.ok
         assert "src/demo/__init__.py" in result.candidates
+
+    def test_stage_d_message_is_tsv_safe(self, git_repo: Path, monkeypatch) -> None:
+        write_text(
+            git_repo / "codoc.yaml",
+            "\n".join(
+                (
+                    "engine:",
+                    "  name: zensical",
+                    "llm:",
+                    "  provider: openai",
+                    "  model: gpt-test",
+                )
+            ),
+        )
+        write_text(git_repo / "src" / "demo" / "__init__.py", "VALUE = 1\n")
+        write_text(
+            git_repo / "src" / "demo" / "codoc.spec.yaml",
+            "\n".join(
+                (
+                    "docs:",
+                    "  - id: index",
+                    "    type: manual",
+                    "    path: docs/index.md",
+                    "coverage:",
+                    "  source:",
+                    "    - id: pkg",
+                    "      type: auto-generated",
+                    "      paths:",
+                    '        - "*.py"',
+                    "      docs:",
+                    "        - id: pkg.overview",
+                    "          path: docs/package.md",
+                )
+            ),
+        )
+        run_generate(git_repo)
+        write_text(git_repo / "src" / "demo" / "__init__.py", "VALUE = 2\n")
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+        def fake_chat(**_kwargs: object) -> str:
+            return "looks ok\tbut\nhas\ttabs"
+
+        monkeypatch.setattr("codoc.commands.validate.chat_completion", fake_chat)
+        result = run_validate(git_repo)
+        assert result.ok
+        stage = next(item for item in result.findings if item.code == "stage.d")
+        assert "\t" not in stage.message
+        assert "\n" not in stage.message
+        assert "looks ok but has tabs" == stage.message
