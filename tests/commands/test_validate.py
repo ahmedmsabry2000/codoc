@@ -101,6 +101,15 @@ class ValidateTests:
         assert not result.ok
         assert any(item.code == "frontmatter.id" for item in result.findings)
 
+    def test_invalid_frontmatter_is_finding(self, git_repo: Path) -> None:
+        _seed(git_repo)
+        run_generate(git_repo)
+        guide = git_repo / "docs" / "guide.md"
+        guide.write_text("---\ncodoc: [\n---\n\n# Guide\n", encoding="utf-8")
+        result = run_validate(git_repo)
+        assert not result.ok
+        assert any(item.code == "frontmatter.invalid" for item in result.findings)
+
     def test_git_candidates_for_changed_coverage(self, git_repo: Path) -> None:
         write_text(git_repo / "codoc.yaml", "engine:\n  name: zensical\n")
         write_text(git_repo / "src" / "demo" / "__init__.py", "VALUE = 1\n")

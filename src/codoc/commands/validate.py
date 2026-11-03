@@ -8,7 +8,7 @@ from pathlib import Path
 
 from codoc.config import ConfigError, LlmConfig, load_project_config
 from codoc.discover import DiscoverError, SpecUnit, discover, git_root
-from codoc.generate.frontmatter import split_frontmatter
+from codoc.generate.frontmatter import FrontmatterError, split_frontmatter
 from codoc.llm import LlmError, chat_completion, resolve_api_key
 from codoc.model.registry import PageRegistry, build_page_registry
 from codoc.model.spec import Page, SpecDocument, SpecError, load_spec
@@ -156,11 +156,19 @@ def _check_page(
         return findings
 
     text = abs_path.read_text(encoding="utf-8")
-    split = split_frontmatter(text)
-    if split.frontmatter is None:
+    try:
+        split = split_frontmatter(text)
+    except FrontmatterError as err:
+        findings.append(Finding("error", "frontmatter.invalid", str(err), page.path))
+        split = None
+
+    if split is None:
+        body = text
+    elif split.frontmatter is None:
         findings.append(
             Finding("error", "frontmatter.missing", "missing codoc frontmatter", page.path)
         )
+        body = split.body
     else:
         if split.frontmatter.id != page.id:
             findings.append(
@@ -180,6 +188,7 @@ def _check_page(
                     page.path,
                 )
             )
+        body = split.body
 
     if page.type == "auto-generated" and page.script and not (root / page.script).is_file():
         findings.append(
@@ -216,7 +225,6 @@ def _check_page(
             )
         )
 
-    body = split.body if split.frontmatter else text
     for _label, target in _MD_LINK.findall(_without_fenced_code(body)):
         href = _link_href(target)
         if href is None:
