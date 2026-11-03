@@ -20,6 +20,7 @@ class LintResult:
     config_file: Path | None
     skipped: bool
     exit_code: int
+    notes: tuple[str, ...] = ()
 
 
 def run_lint(start: Path | None = None) -> LintResult:
@@ -33,6 +34,7 @@ def run_lint(start: Path | None = None) -> LintResult:
             config_file=None,
             skipped=True,
             exit_code=0,
+            notes=paths.notes,
         )
     if paths.vale_ini is None:
         raise LintError("vale enabled but generated .vale.ini is missing")
@@ -56,6 +58,7 @@ def run_lint(start: Path | None = None) -> LintResult:
         config_file=paths.vale_ini,
         skipped=False,
         exit_code=0,
+        notes=paths.notes,
     )
 
 

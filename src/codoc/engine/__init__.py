@@ -1,6 +1,7 @@
-"""Site-engine helpers: generated mkdocs/Vale config."""
+"""Site-engine helpers: generated engine shim and Vale config."""
 
 from codoc.engine.codegen import (
+    ENGINE_SHIM,
     CodegenError,
     GeneratedPaths,
     ensure_generated,
@@ -8,6 +9,7 @@ from codoc.engine.codegen import (
 )
 
 __all__ = [
+    "ENGINE_SHIM",
     "CodegenError",
     "GeneratedPaths",
     "ensure_generated",

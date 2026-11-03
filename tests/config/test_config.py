@@ -50,7 +50,7 @@ class ConfigTests:
         with _file(_PROJECT) as path:
             loaded = load_project_config(path)
         assert loaded == ProjectConfig(
-            engine=EngineConfig("zensical", "docs", "site"),
+            engine=EngineConfig("zensical", "docs", "site", "Documentation"),
             vale=ValeConfig(True),
             llm=LlmConfig("openai", "gpt-4.1"),
             paths=PathsConfig(".codoc/scripts"),

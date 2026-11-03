@@ -99,6 +99,8 @@ def _run_init(*, force: bool) -> None:
         for line in str(err).splitlines():
             print(f"codoc init: {line}", file=sys.stderr)
         raise SystemExit(1) from err
+    for note in result.notes:
+        print(f"codoc init: {note}", file=sys.stderr)
     for path in result.written:
         print(path.as_posix())
 
@@ -109,6 +111,8 @@ def _run_build() -> None:
     except SiteError as err:
         print(f"codoc build: {err}", file=sys.stderr)
         raise SystemExit(1) from err
+    for note in result.notes:
+        print(f"codoc build: {note}", file=sys.stderr)
     print(result.site_dir.as_posix())
 
 
@@ -118,6 +122,8 @@ def _run_serve() -> None:
     except SiteError as err:
         print(f"codoc serve: {err}", file=sys.stderr)
         raise SystemExit(1) from err
+    for note in result.notes:
+        print(f"codoc serve: {note}", file=sys.stderr)
     print(f"pid\t{result.pid}")
     print(f"url\thttp://{result.dev_addr}/")
     print(f"log\t{result.log_file.as_posix()}")
@@ -130,6 +136,8 @@ def _run_lint() -> None:
     except LintError as err:
         print(f"codoc lint: {err}", file=sys.stderr)
         raise SystemExit(1) from err
+    for note in result.notes:
+        print(f"codoc lint: {note}", file=sys.stderr)
     if result.skipped:
         print("codoc lint: vale disabled", file=sys.stderr)
         return
