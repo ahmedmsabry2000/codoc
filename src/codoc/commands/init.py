@@ -32,9 +32,34 @@ coverage:
       docs:
         - id: package.overview
           path: docs/package.md
+          script: .codoc/scripts/gen_package_overview.py
+          canonical: index
 """
 
 _INDEX_TEMPLATE = "# Documentation site\n\nPackage overview\n"
+
+_PACKAGE_OVERVIEW_SCRIPT = '''\
+"""Emit a short auto-generated package overview page."""
+
+from pathlib import Path
+import os
+
+scope = Path(os.environ["CODOC_SCOPE_DIR"])
+root = Path(os.environ["CODOC_ROOT"])
+package = (root / scope).resolve()
+py_files = sorted(path.name for path in package.glob("*.py") if path.is_file())
+print(f"# {scope.name} overview")
+print()
+print(f"Package scope `{scope.as_posix()}`.")
+print()
+if py_files:
+    print("Python modules:")
+    print()
+    for name in py_files:
+        print(f"- `{name}`")
+else:
+    print("No top-level Python modules found under this scope.")
+'''
 
 _CODOC_IGNORE_LINES = (".codoc/*", "!.codoc/scripts/", "!.codoc/scripts/**")
 # Engine shim is generated from codoc.yaml; not a second source of truth.
@@ -108,6 +133,12 @@ def run_init(start: Path | None = None, *, force: bool = False) -> InitResult:
     if not gitkeep.exists():
         _atomic_write(gitkeep, "")
         written.append(_GITKEEP)
+
+    overview_script = Path(".codoc") / "scripts" / "gen_package_overview.py"
+    overview_abs = root / overview_script
+    if force or not overview_abs.exists():
+        _atomic_write(overview_abs, _PACKAGE_OVERVIEW_SCRIPT)
+        written.append(overview_script)
 
     gitignore = root / ".gitignore"
     if _ensure_gitignore(gitignore):

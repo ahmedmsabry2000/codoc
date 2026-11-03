@@ -11,6 +11,6 @@ This repository is the Codoc Python package (`codoc` CLI).
 - Unknown work stays out of the tree. Add a module when implementing it, not as an empty placeholder.
 - Do not put roadmap, ticket, milestone, or product-vision text into rules, comments, README, commit messages that narrate a plan, or other repo files.
 - Put CLI command names and aliases only in `COMMANDS` in `src/codoc/cli/`.
-- Keep package code under `src/codoc/{cli,commands,config,discover,engine,model}/`. Mirror that layout under `tests/`.
+- Keep package code under `src/codoc/{cli,commands,config,discover,engine,generate,llm,model}/`. Mirror that layout under `tests/`.
 
 Agent guidance source of truth is `.cursor/rules/`. `AGENTS.md` is an index that points here.

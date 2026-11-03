@@ -55,6 +55,7 @@ class CliTests:
                 "serve",
                 "lint",
                 "clean",
+                "generate",
             }:
                 continue
             stderr = io.StringIO()

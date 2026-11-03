@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from codoc.commands.clean import CleanError, run_clean
+from codoc.commands.generate import GenerateError, run_generate
 from codoc.commands.init import InitError, run_init
 from codoc.commands.lint import LintError, run_lint
 from codoc.commands.recommend import RecommendError, run_recommend
@@ -78,6 +79,9 @@ def main(argv: list[str] | None = None) -> None:
         return
     if behavior == "clean":
         _run_clean()
+        return
+    if behavior == "generate":
+        _run_generate()
         return
     _not_implemented(behavior)
 
@@ -168,6 +172,17 @@ def _run_clean() -> None:
         print("stopped\tserve")
     for path in result.removed:
         print(path.as_posix())
+
+
+def _run_generate() -> None:
+    try:
+        result = run_generate(Path.cwd())
+    except GenerateError as err:
+        print(f"codoc generate: {err}", file=sys.stderr)
+        raise SystemExit(1) from err
+    print("page_id\tpath\taction")
+    for page in result.pages:
+        print(f"{page.page_id}\t{page.path.as_posix()}\t{page.action}")
 
 
 def _run_status() -> None:
