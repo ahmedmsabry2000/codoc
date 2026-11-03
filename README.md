@@ -23,7 +23,7 @@ Git hooks run the same checks on commit via pre-commit (`uv run pre-commit run -
 ## Test
 
 ```bash
-uv run python -m unittest discover -s tests -v
+uv run pytest
 ```
 
 ## Run

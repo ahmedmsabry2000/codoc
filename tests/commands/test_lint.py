@@ -2,11 +2,12 @@ import io
 import os
 import shutil
 import subprocess
-import unittest
 from collections.abc import Iterator
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 import codoc.cli as cli
 from codoc.commands.init import run_init
@@ -56,7 +57,7 @@ def _patch_vale_run(completed: MagicMock):
     return patch("codoc.commands.lint.subprocess.run", side_effect=run)
 
 
-class LintCmdTests(unittest.TestCase):
+class LintCmdTests:
     def test_lint_invokes_vale_with_generated_config(self) -> None:
         with _git_repo() as repo:
             run_init(repo)
@@ -71,24 +72,26 @@ class LintCmdTests(unittest.TestCase):
                 for call in run.call_args_list
                 if call.args and call.args[0] and call.args[0][0] == "vale"
             ]
-            self.assertEqual(len(vale_calls), 1)
-            self.assertEqual(
-                vale_calls[0].args[0],
-                ["vale", "--config", ".codoc/generated/.vale.ini", "docs"],
-            )
-            self.assertTrue(os.path.samefile(vale_calls[0].kwargs["cwd"], repo))
-            self.assertFalse(result.skipped)
-            self.assertTrue((repo / ".codoc" / "generated" / ".vale.ini").is_file())
+            assert len(vale_calls) == 1
+            assert vale_calls[0].args[0] == [
+                "vale",
+                "--config",
+                ".codoc/generated/.vale.ini",
+                "docs",
+            ]
+            assert os.path.samefile(vale_calls[0].kwargs["cwd"], repo)
+            assert not result.skipped
+            assert (repo / ".codoc" / "generated" / ".vale.ini").is_file()
 
     def test_lint_missing_binary(self) -> None:
         with _git_repo() as repo:
             run_init(repo)
             with (
                 patch("codoc.commands.lint.shutil.which", return_value=None),
-                self.assertRaises(LintError) as caught,
+                pytest.raises(LintError) as caught,
             ):
                 run_lint(repo)
-            self.assertIn("vale not found on PATH", str(caught.exception))
+            assert "vale not found on PATH" in str(caught.value)
 
     def test_lint_disabled_skips_vale(self) -> None:
         with _git_repo() as repo:
@@ -99,7 +102,7 @@ class LintCmdTests(unittest.TestCase):
             with patch("codoc.commands.lint.shutil.which") as which:
                 result = run_lint(repo)
             which.assert_not_called()
-            self.assertTrue(result.skipped)
+            assert result.skipped
 
     def test_lint_vale_failure_raises(self) -> None:
         with _git_repo() as repo:
@@ -108,10 +111,10 @@ class LintCmdTests(unittest.TestCase):
             with (
                 patch("codoc.commands.lint.shutil.which", return_value="/bin/vale"),
                 _patch_vale_run(completed),
-                self.assertRaises(LintError) as caught,
+                pytest.raises(LintError) as caught,
             ):
                 run_lint(repo)
-            self.assertIn("vale failed with exit 1", str(caught.exception))
+            assert "vale failed with exit 1" in str(caught.value)
 
     def test_cli_lint_prints_docs_dir(self) -> None:
         with _git_repo() as repo:
@@ -122,9 +125,9 @@ class LintCmdTests(unittest.TestCase):
                 _patch_vale_run(completed),
             ):
                 out, err, code = _run_in(repo, ["lint"])
-        self.assertEqual(code, None)
-        self.assertEqual(out, "docs\n")
-        self.assertEqual(err, "")
+        assert code is None
+        assert out == "docs\n"
+        assert err == ""
 
     def test_cli_lint_disabled_message(self) -> None:
         with _git_repo() as repo:
@@ -134,26 +137,22 @@ class LintCmdTests(unittest.TestCase):
                 encoding="utf-8",
             )
             out, err, code = _run_in(repo, ["lint"])
-        self.assertEqual(code, None)
-        self.assertEqual(out, "")
-        self.assertIn("codoc lint: vale disabled", err)
+        assert code is None
+        assert out == ""
+        assert "codoc lint: vale disabled" in err
 
     def test_cli_lint_missing_binary_exits_1(self) -> None:
         with _git_repo() as repo:
             run_init(repo)
             with patch("codoc.commands.lint.shutil.which", return_value=None):
                 out, err, code = _run_in(repo, ["lint"])
-        self.assertEqual(code, 1)
-        self.assertEqual(out, "")
-        self.assertIn("vale not found on PATH", err)
+        assert code == 1
+        assert out == ""
+        assert "vale not found on PATH" in err
 
-    @unittest.skipUnless(shutil.which("vale"), "vale not on PATH")
+    @pytest.mark.skipif(not shutil.which("vale"), reason="vale not on PATH")
     def test_live_vale_lint(self) -> None:
         with _git_repo() as repo:
             run_init(repo)
             result = run_lint(repo)
-            self.assertFalse(result.skipped)
-
-
-if __name__ == "__main__":
-    unittest.main()
+            assert not result.skipped
