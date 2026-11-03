@@ -214,4 +214,4 @@ class ValidateTests:
         stage = next(item for item in result.findings if item.code == "stage.d")
         assert "\t" not in stage.message
         assert "\n" not in stage.message
-        assert "looks ok but has tabs" == stage.message
+        assert stage.message == "looks ok but has tabs"
