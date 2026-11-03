@@ -4,26 +4,19 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from codoc.config import ProjectConfig
 from codoc.discover import DEFAULT_SKIP, DiscoverError, git_root
-from codoc.engine.engulf import EngulfError, seed_engine_from_legacy
+from codoc.engine.engulf import (
+    EngulfError,
+    relocate_legacy_engine_files,
+    render_project_yaml,
+    seed_engine_from_legacy,
+)
 
 _PROJECT_FILE = "codoc.yaml"
 _SPEC_FILE = "codoc.spec.yaml"
 _INDEX_FILE = Path("docs") / "index.md"
 _GITKEEP = Path(".codoc") / "scripts" / ".gitkeep"
-
-def _project_template(*, name: str, docs_dir: str, site_dir: str) -> str:
-    return (
-        "engine:\n"
-        f"  name: {name}\n"
-        f"  docs_dir: {docs_dir}\n"
-        f"  site_dir: {site_dir}\n"
-        "vale:\n"
-        "  enabled: true\n"
-        "paths:\n"
-        "  scripts_dir: .codoc/scripts\n"
-        "terms: []\n"
-    )
 
 _SPEC_TEMPLATE = """\
 docs:
@@ -88,20 +81,17 @@ def run_init(start: Path | None = None, *, force: bool = False) -> InitResult:
 
     notes: list[str] = []
     try:
-        engine, note = seed_engine_from_legacy(root)
+        engine, legacy_source = seed_engine_from_legacy(root)
     except EngulfError as err:
         raise InitError(str(err)) from err
-    if note:
-        notes.append(note)
+    if legacy_source is not None:
+        notes.append(
+            f"imported engine settings from {legacy_source.name} into codoc.yaml"
+        )
 
     written: list[Path] = []
 
-    _atomic_write(
-        project,
-        _project_template(
-            name=engine.name, docs_dir=engine.docs_dir, site_dir=engine.site_dir
-        ),
-    )
+    _atomic_write(project, render_project_yaml(ProjectConfig(engine=engine)))
     written.append(Path(_PROJECT_FILE))
 
     # pkg is repo-relative; always mkdir under root (not cwd).
@@ -124,6 +114,9 @@ def run_init(start: Path | None = None, *, force: bool = False) -> InitResult:
     gitignore = root / ".gitignore"
     if _ensure_gitignore(gitignore):
         written.append(Path(".gitignore"))
+
+    # One live project config: archive root engine ymls under .codoc/imported/.
+    notes.extend(relocate_legacy_engine_files(root))
 
     ordered = tuple(sorted(written, key=lambda path: path.as_posix()))
     return InitResult(

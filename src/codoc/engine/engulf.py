@@ -1,4 +1,4 @@
-"""Import root mkdocs.yml / zensical.yml into codoc.yaml engine settings."""
+"""Import root mkdocs.yml / zensical.yml into codoc.yaml; one project config only."""
 
 import os
 import tempfile
@@ -14,6 +14,8 @@ _LEGACY_FILES: tuple[tuple[str, str], ...] = (
     ("zensical.yml", "zensical"),
     ("mkdocs.yml", "mkdocs"),
 )
+# Archive for engulfed root engine configs (under gitignored .codoc/).
+IMPORTED_DIR = Path(".codoc") / "imported"
 
 
 class EngulfError(Exception):
@@ -43,16 +45,57 @@ def pick_legacy_engine_file(
 
 
 def read_legacy_engine(path: Path, engine_name: str) -> EngineConfig:
-    """Parse docs_dir/site_dir from a MkDocs-shaped config; name comes from the file."""
+    """Parse MkDocs-shaped keys Codoc can carry into engine: / the shim."""
     data = _load_mapping(path)
     docs_dir = "docs"
     site_dir = "site"
-    # Only fields Codoc's engine: section understands; other keys stay in the legacy file.
+    site_name = "Documentation"
+    theme = None
+    nav = None
     if "docs_dir" in data:
         docs_dir = _legacy_relative(data["docs_dir"], path, "docs_dir")
     if "site_dir" in data:
         site_dir = _legacy_relative(data["site_dir"], path, "site_dir")
-    return EngineConfig(engine_name, docs_dir, site_dir)
+    if "site_name" in data:
+        raw_name = data["site_name"]
+        if not isinstance(raw_name, str) or raw_name == "":
+            raise EngulfError(f"{path.name}: site_name: expected a non-empty string")
+        site_name = raw_name
+    if "theme" in data:
+        theme_raw = data["theme"]
+        if isinstance(theme_raw, str):
+            theme = {"name": theme_raw}
+        elif isinstance(theme_raw, dict):
+            theme = theme_raw
+        else:
+            raise EngulfError(f"{path.name}: theme: expected a mapping or theme name")
+    if "nav" in data:
+        if not isinstance(data["nav"], list):
+            raise EngulfError(f"{path.name}: nav: expected a list")
+        nav = data["nav"]
+    return EngineConfig(engine_name, docs_dir, site_dir, site_name, theme, nav)
+
+
+def relocate_legacy_engine_files(root: Path) -> tuple[str, ...]:
+    """
+    Move any root mkdocs.yml / zensical.yml under .codoc/imported/.
+
+    Codoc is all-in-one: after adopt, those must not remain as live configs.
+    """
+    notes: list[str] = []
+    dest_dir = root / IMPORTED_DIR
+    for filename, _name in _LEGACY_FILES:
+        source = root / filename
+        if not source.is_file():
+            continue
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / filename
+        os.replace(source, dest)
+        notes.append(
+            f"moved {filename} to {IMPORTED_DIR.as_posix()}/{filename} "
+            f"(codoc.yaml is the only project config)"
+        )
+    return tuple(notes)
 
 
 def engulf_project(
@@ -63,54 +106,60 @@ def engulf_project(
     project_path: Path | None = None,
 ) -> EngulfOutcome:
     """
-    Merge a root legacy engine file into config.engine.
+    Merge a root legacy engine file into config.engine, then archive root legacy files.
 
     When fill_defaults_only is True, only replace engine fields that still equal
     EngineConfig defaults (so a later user edit to codoc.yaml is not clobbered).
-    Writes codoc.yaml when the merged engine differs. Never deletes the legacy file.
+    Writes codoc.yaml when the merged engine differs. Relocates root legacy configs
+    so Codoc remains the single live project config.
     """
     picked = pick_legacy_engine_file(root, preferred_name=config.engine.name.lower())
-    if picked is None:
-        return EngulfOutcome(config, None, False, None)
+    parts: list[str] = []
+    updated = config
+    wrote = False
+    source: Path | None = None
 
-    source, engine_name = picked
-    legacy = read_legacy_engine(source, engine_name)
-    merged = _merge_engine(config.engine, legacy, fill_defaults_only=fill_defaults_only)
-    if merged == config.engine:
-        return EngulfOutcome(config, source, False, None)
+    if picked is not None:
+        source, engine_name = picked
+        legacy = read_legacy_engine(source, engine_name)
+        merged = _merge_engine(
+            config.engine, legacy, fill_defaults_only=fill_defaults_only
+        )
+        if merged != config.engine:
+            updated = replace(config, engine=merged)
+            target = project_path if project_path is not None else root / "codoc.yaml"
+            _write_project(target, updated)
+            wrote = True
+            parts.append(f"imported engine settings from {source.name} into codoc.yaml")
 
-    updated = replace(config, engine=merged)
-    target = project_path if project_path is not None else root / "codoc.yaml"
-    _write_project(target, updated)
-    note = (
-        f"imported engine settings from {source.name} into codoc.yaml; "
-        f"left {source.name} in place (codoc.yaml is SoT)"
-    )
-    return EngulfOutcome(updated, source, True, note)
+    parts.extend(relocate_legacy_engine_files(root))
+    note = "; ".join(parts) if parts else None
+    return EngulfOutcome(updated, source, wrote, note)
 
 
-def seed_engine_from_legacy(root: Path) -> tuple[EngineConfig, str | None]:
-    """For init: build engine settings from a legacy file when present."""
+def seed_engine_from_legacy(root: Path) -> tuple[EngineConfig, Path | None]:
+    """For init: read engine settings from a legacy file when present (before relocate)."""
     picked = pick_legacy_engine_file(root)
     if picked is None:
         return EngineConfig(), None
     source, engine_name = picked
-    engine = read_legacy_engine(source, engine_name)
-    note = (
-        f"imported engine settings from {source.name} into codoc.yaml; "
-        f"left {source.name} in place (codoc.yaml is SoT)"
-    )
-    return engine, note
+    return read_legacy_engine(source, engine_name), source
 
 
 def render_project_yaml(config: ProjectConfig) -> str:
     """Serialize ProjectConfig to YAML text for codoc.yaml."""
+    engine: dict = {
+        "name": config.engine.name,
+        "docs_dir": config.engine.docs_dir,
+        "site_dir": config.engine.site_dir,
+        "site_name": config.engine.site_name,
+    }
+    if config.engine.theme is not None:
+        engine["theme"] = config.engine.theme
+    if config.engine.nav is not None:
+        engine["nav"] = config.engine.nav
     data: dict = {
-        "engine": {
-            "name": config.engine.name,
-            "docs_dir": config.engine.docs_dir,
-            "site_dir": config.engine.site_dir,
-        },
+        "engine": engine,
         "vale": {"enabled": config.vale.enabled},
         "paths": {"scripts_dir": config.paths.scripts_dir},
         "terms": list(config.terms),
@@ -142,7 +191,14 @@ def _merge_engine(
     site_dir = (
         legacy.site_dir if current.site_dir == defaults.site_dir else current.site_dir
     )
-    return EngineConfig(name, docs_dir, site_dir)
+    site_name = (
+        legacy.site_name
+        if current.site_name == defaults.site_name
+        else current.site_name
+    )
+    theme = legacy.theme if current.theme is None else current.theme
+    nav = legacy.nav if current.nav is None else current.nav
+    return EngineConfig(name, docs_dir, site_dir, site_name, theme, nav)
 
 
 def _load_mapping(path: Path) -> dict:

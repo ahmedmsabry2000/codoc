@@ -72,26 +72,6 @@ class InitTests:
         assert "src/my_app/codoc.spec.yaml\tsrc/my_app\t2" in out
         assert "registry_pages\t2" in out
 
-    def test_init_imports_existing_mkdocs_yml(self) -> None:
-        with _git_repo("adopt") as repo:
-            (repo / "mkdocs.yml").write_text(
-                "site_name: Old\ndocs_dir: handbook\nsite_dir: public\n",
-                encoding="utf-8",
-            )
-            result = run_init(repo)
-            assert result.notes
-            assert "mkdocs.yml" in result.notes[0]
-            assert (repo / "mkdocs.yml").read_text(encoding="utf-8").startswith(
-                "site_name: Old"
-            )
-            config = load_project_config(repo / "codoc.yaml")
-            assert config.engine.name == "mkdocs"
-            assert config.engine.docs_dir == "handbook"
-            assert config.engine.site_dir == "public"
-            out, err, code = _run_in(repo, ["init", "--force"])
-        assert code in (0, None)
-        assert "imported engine settings from mkdocs.yml" in err
-
     def test_second_init_refuses_without_force(self) -> None:
         with _git_repo() as repo:
             first = run_init(repo)

@@ -5,6 +5,8 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
+import yaml
+
 from codoc.config import ConfigError, ProjectConfig, load_project_config
 from codoc.discover import DiscoverError, git_root
 from codoc.engine.engulf import EngulfError, engulf_project
@@ -80,7 +82,6 @@ def write_generated(
     engine_text = _render_engine(config)
     _atomic_write(root / engine_rel, engine_text)
     written.append(engine_rel)
-    # Legacy mkdocs.yml / zensical.yml are left in place after engulf into codoc.yaml.
 
     vale_ini: Path | None = None
     vocab_accept: Path | None = None
@@ -108,12 +109,18 @@ def write_generated(
 
 
 def _render_engine(config: ProjectConfig) -> str:
-    return (
-        f"{_HEADER}"
-        f"site_name: Documentation\n"
-        f"docs_dir: {Path(config.engine.docs_dir).as_posix()}\n"
-        f"site_dir: {Path(config.engine.site_dir).as_posix()}\n"
-    )
+    body: dict = {
+        "site_name": config.engine.site_name,
+        "docs_dir": Path(config.engine.docs_dir).as_posix(),
+        "site_dir": Path(config.engine.site_dir).as_posix(),
+    }
+    if config.engine.theme is not None:
+        body["theme"] = config.engine.theme
+    if config.engine.nav is not None:
+        body["nav"] = config.engine.nav
+    dumped = yaml.safe_dump(body, sort_keys=False, default_flow_style=False)
+    assert isinstance(dumped, str)
+    return f"{_HEADER}{dumped}"
 
 
 def _render_vale_ini() -> str:
