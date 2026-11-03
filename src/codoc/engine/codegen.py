@@ -10,6 +10,7 @@ import yaml
 from codoc.config import ConfigError, ProjectConfig, load_project_config
 from codoc.discover import DiscoverError, git_root
 from codoc.engine.engulf import EngulfError, engulf_project
+from codoc.engine.vocab import grow_learned, merge_accept_terms, read_learned
 
 _GENERATED_DIR = Path(".codoc") / "generated"
 # Zensical treats the config file's directory as the project root and rejects
@@ -39,9 +40,14 @@ class GeneratedPaths:
     vocab_accept: Path | None
     written: tuple[Path, ...]
     notes: tuple[str, ...] = ()
+    learned_added: tuple[str, ...] = ()
 
 
-def ensure_generated(start: Path | None = None) -> GeneratedPaths:
+def ensure_generated(
+    start: Path | None = None,
+    *,
+    learn: bool = True,
+) -> GeneratedPaths:
     """Load codoc.yaml at the git root and refresh generated engine/Vale files."""
     if start is None:
         start = Path.cwd()
@@ -61,7 +67,7 @@ def ensure_generated(start: Path | None = None) -> GeneratedPaths:
     except EngulfError as err:
         raise CodegenError(str(err)) from err
     notes = (outcome.note,) if outcome.note else ()
-    return write_generated(root, outcome.config, notes=notes)
+    return write_generated(root, outcome.config, notes=notes, learn=learn)
 
 
 def write_generated(
@@ -69,6 +75,7 @@ def write_generated(
     config: ProjectConfig,
     *,
     notes: tuple[str, ...] = (),
+    learn: bool = True,
 ) -> GeneratedPaths:
     """Materialize the engine shim and Vale files from ProjectConfig."""
     name = config.engine.name.lower()
@@ -83,12 +90,26 @@ def write_generated(
 
     vale_ini: Path | None = None
     vocab_accept: Path | None = None
+    learned_added: tuple[str, ...] = ()
+    extra_notes = list(notes)
     if config.vale.enabled:
+        if learn:
+            growth = grow_learned(
+                root,
+                Path(config.engine.docs_dir),
+                seed=config.terms,
+            )
+            learned_added = growth.added
+            written.append(growth.learned_path)
+            if growth.added:
+                extra_notes.append(f"learned {len(growth.added)} new term(s)")
+        learned = read_learned(root)
+        accept_terms = merge_accept_terms(config.terms, learned)
         vale_ini = _VALE_INI
         vocab_accept = _ACCEPT
         _atomic_write(root / vale_ini, _render_vale_ini())
         written.append(vale_ini)
-        _atomic_write(root / vocab_accept, _render_accept(config.terms))
+        _atomic_write(root / vocab_accept, _render_accept(accept_terms))
         written.append(vocab_accept)
         reject = _REJECT
         if not (root / reject).exists():
@@ -102,7 +123,8 @@ def write_generated(
         vale_ini=vale_ini,
         vocab_accept=vocab_accept,
         written=ordered,
-        notes=notes,
+        notes=tuple(extra_notes),
+        learned_added=learned_added,
     )
 
 

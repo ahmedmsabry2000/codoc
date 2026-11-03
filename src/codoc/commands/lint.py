@@ -21,11 +21,12 @@ class LintResult:
     skipped: bool
     exit_code: int
     notes: tuple[str, ...] = ()
+    learned_added: tuple[str, ...] = ()
 
 
-def run_lint(start: Path | None = None) -> LintResult:
+def run_lint(start: Path | None = None, *, learn: bool = True) -> LintResult:
     """Refresh generated config and run `vale --config … <docs_dir>` when enabled."""
-    paths, config = _prepare(start)
+    paths, config = _prepare(start, learn=learn)
     docs = Path(config.engine.docs_dir)
     if not config.vale.enabled:
         return LintResult(
@@ -35,6 +36,7 @@ def run_lint(start: Path | None = None) -> LintResult:
             skipped=True,
             exit_code=0,
             notes=paths.notes,
+            learned_added=paths.learned_added,
         )
     if paths.vale_ini is None:
         raise LintError("vale enabled but generated .vale.ini is missing")
@@ -59,14 +61,19 @@ def run_lint(start: Path | None = None) -> LintResult:
         skipped=False,
         exit_code=0,
         notes=paths.notes,
+        learned_added=paths.learned_added,
     )
 
 
-def _prepare(start: Path | None) -> tuple[GeneratedPaths, ProjectConfig]:
+def _prepare(
+    start: Path | None,
+    *,
+    learn: bool,
+) -> tuple[GeneratedPaths, ProjectConfig]:
     if start is None:
         start = Path.cwd()
     try:
-        paths = ensure_generated(start)
+        paths = ensure_generated(start, learn=learn)
     except CodegenError as err:
         raise LintError(str(err)) from err
     try:

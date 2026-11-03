@@ -66,7 +66,7 @@ def main(argv: list[str] | None = None) -> None:
         _run_serve()
         return
     if behavior == "lint":
-        _run_lint()
+        _run_lint(learn=not bool(getattr(args, "no_learn", False)))
         return
     if behavior == "clean":
         _run_clean()
@@ -88,6 +88,12 @@ def _build_parser() -> argparse.ArgumentParser:
                 "--force",
                 action="store_true",
                 help="Overwrite codoc.yaml, the starter spec, and docs/index.md.",
+            )
+        if command.name == "lint":
+            subparser.add_argument(
+                "--no-learn",
+                action="store_true",
+                help="Do not harvest new terms from docs into .codoc/vocab/learned.txt.",
             )
     return parser
 
@@ -130,9 +136,9 @@ def _run_serve() -> None:
     print(f"pidfile\t{result.pid_file.as_posix()}")
 
 
-def _run_lint() -> None:
+def _run_lint(*, learn: bool) -> None:
     try:
-        result = run_lint(Path.cwd())
+        result = run_lint(Path.cwd(), learn=learn)
     except LintError as err:
         print(f"codoc lint: {err}", file=sys.stderr)
         raise SystemExit(1) from err
