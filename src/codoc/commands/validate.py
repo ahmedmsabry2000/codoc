@@ -246,20 +246,29 @@ def _check_page(
 
 
 def _without_fenced_code(text: str) -> str:
-    """Drop fenced code blocks so sample links inside them are not checked."""
+    """Drop closed fenced code blocks so sample links inside them are not checked.
+
+    An unclosed fence is treated as prose so later real links are still checked.
+    """
     lines = text.splitlines(keepends=True)
     kept: list[str] = []
+    pending: list[str] = []
     fence: str | None = None
     for line in lines:
         if fence is None:
             match = _FENCE_OPEN.match(line.strip())
             if match:
                 fence = match.group(1)[0] * len(match.group(1))
+                pending = [line]
                 continue
             kept.append(line)
             continue
+        pending.append(line)
         if line.strip().startswith(fence):
             fence = None
+            pending = []
+    if fence is not None:
+        kept.extend(pending)
     return "".join(kept)
 
 
