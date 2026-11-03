@@ -10,6 +10,7 @@ from codoc.commands.lint import LintError, run_lint
 from codoc.commands.recommend import RecommendError, run_recommend
 from codoc.commands.site import SiteError, run_build, run_serve
 from codoc.commands.status import StatusError, run_status
+from codoc.commands.validate import ValidateError, run_validate
 
 
 @dataclass(frozen=True)
@@ -82,6 +83,9 @@ def main(argv: list[str] | None = None) -> None:
         return
     if behavior == "generate":
         _run_generate()
+        return
+    if behavior == "validate":
+        _run_validate()
         return
     _not_implemented(behavior)
 
@@ -183,6 +187,26 @@ def _run_generate() -> None:
     print("page_id\tpath\taction")
     for page in result.pages:
         print(f"{page.page_id}\t{page.path.as_posix()}\t{page.action}")
+
+
+def _run_validate() -> None:
+    try:
+        result = run_validate(Path.cwd())
+    except ValidateError as err:
+        print(f"codoc validate: {err}", file=sys.stderr)
+        raise SystemExit(1) from err
+    for note in result.notes:
+        print(f"codoc validate: {note}", file=sys.stderr)
+    if result.rag_path is not None:
+        print(f"rag\t{result.rag_path.as_posix()}")
+    if result.candidates:
+        print("candidates\t" + ",".join(result.candidates))
+    print("severity\tcode\tpath\tmessage")
+    for finding in result.findings:
+        path = finding.path or ""
+        print(f"{finding.severity}\t{finding.code}\t{path}\t{finding.message}")
+    if not result.ok:
+        raise SystemExit(1)
 
 
 def _run_status() -> None:

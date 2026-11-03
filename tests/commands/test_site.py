@@ -64,6 +64,8 @@ class SiteCmdTests:
             run_init(repo)
             with (
                 patch("codoc.commands.site.shutil.which", return_value=None),
+                patch("codoc.commands.site.sys.prefix", "/tmp/codoc-no-venv"),
+                patch("codoc.commands.site.sys.executable", "/tmp/codoc-no-venv/bin/python"),
                 pytest.raises(SiteError) as caught,
             ):
                 run_build(repo)
@@ -159,7 +161,11 @@ class SiteCmdTests:
     def test_cli_build_missing_binary_exits_1(self) -> None:
         with git_repository() as repo:
             run_init(repo)
-            with patch("codoc.commands.site.shutil.which", return_value=None):
+            with (
+                patch("codoc.commands.site.shutil.which", return_value=None),
+                patch("codoc.commands.site.sys.prefix", "/tmp/codoc-no-venv"),
+                patch("codoc.commands.site.sys.executable", "/tmp/codoc-no-venv/bin/python"),
+            ):
                 out, err, code = run_cli(repo, ["build"])
         assert code == 1
         assert out == ""

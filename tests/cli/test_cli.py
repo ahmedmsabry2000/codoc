@@ -6,7 +6,9 @@ from pathlib import Path
 import pytest
 
 import codoc.cli as cli
+from codoc.commands.generate import run_generate
 from codoc.discover import git_root
+from tests.support.cli import run_cli
 from tests.support.fs import write_text
 from tests.support.git import git_repository
 
@@ -56,6 +58,7 @@ class CliTests:
                 "lint",
                 "clean",
                 "generate",
+                "validate",
             }:
                 continue
             stderr = io.StringIO()
@@ -209,12 +212,19 @@ class CliTests:
         assert stdout == ""
         assert stderr == f"codoc status: {later}: duplicate page id 'overview' also in {earlier}\n"
 
-    def test_drift_alias_prints_validate_not_implemented(self) -> None:
-        stderr = io.StringIO()
-        with redirect_stderr(stderr), pytest.raises(SystemExit) as caught:
-            cli.main(["drift"])
-        assert caught.value.code == 2
-        assert stderr.getvalue() == "codoc validate: not implemented\n"
+    def test_drift_alias_runs_validate(self) -> None:
+        with git_repository() as repo:
+            write_text(repo / "codoc.yaml", "engine:\n  name: zensical\n")
+            write_text(
+                repo / "src" / "demo" / "codoc.spec.yaml",
+                "docs:\n  - id: index\n    type: manual\n    path: docs/index.md\n",
+            )
+            run_generate(repo)
+            stdout, stderr, code = run_cli(repo, ["drift"])
+        assert code is None
+        assert stderr == ""
+        assert "severity\tcode\tpath\tmessage" in stdout
+        assert "rag\t" in stdout
 
     def test_aliases_point_at_existing_commands(self) -> None:
         by_name = {command.name: command for command in cli.COMMANDS}

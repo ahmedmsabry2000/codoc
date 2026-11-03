@@ -97,6 +97,7 @@ class GenerateTests:
         assert "[Guide](guide.md)" in split.body
         assert "## Sources" in split.body
         assert "`__init__.py`" in split.body
+        assert "](../src/demo/__init__.py)" in split.body
 
     def test_hybrid_injects_placeholder(self, git_repo: Path) -> None:
         script = _write_script(
