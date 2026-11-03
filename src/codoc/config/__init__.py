@@ -17,6 +17,10 @@ class EngineConfig:
     name: str = "zensical"
     docs_dir: str = "docs"
     site_dir: str = "site"
+    site_name: str = "Documentation"
+    # Opaque MkDocs-shaped structures carried through to the engine shim.
+    theme: dict | None = None
+    nav: list | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -161,17 +165,39 @@ def _engine(data: dict, fail) -> EngineConfig:
     if "engine" not in data:
         return EngineConfig()
     raw = _mapping(data["engine"], "engine", fail)
-    _reject_unknown(raw, frozenset({"name", "docs_dir", "site_dir"}), "engine", fail)
+    _reject_unknown(
+        raw,
+        frozenset({"name", "docs_dir", "site_dir", "site_name", "theme", "nav"}),
+        "engine",
+        fail,
+    )
     name = "zensical"
     docs_dir = "docs"
     site_dir = "site"
+    site_name = "Documentation"
+    theme = None
+    nav = None
     if "name" in raw:
         name = _nonempty_str(raw["name"], "engine.name", fail)
     if "docs_dir" in raw:
         docs_dir = _relative_path(raw["docs_dir"], "engine.docs_dir", fail)
     if "site_dir" in raw:
         site_dir = _relative_path(raw["site_dir"], "engine.site_dir", fail)
-    return EngineConfig(name, docs_dir, site_dir)
+    if "site_name" in raw:
+        site_name = _nonempty_str(raw["site_name"], "engine.site_name", fail)
+    if "theme" in raw:
+        theme_raw = raw["theme"]
+        if isinstance(theme_raw, str):
+            theme = {"name": theme_raw}
+        elif isinstance(theme_raw, dict):
+            theme = theme_raw
+        else:
+            raise fail("engine.theme: expected a mapping or theme name string")
+    if "nav" in raw:
+        if not isinstance(raw["nav"], list):
+            raise fail("engine.nav: expected a list")
+        nav = raw["nav"]
+    return EngineConfig(name, docs_dir, site_dir, site_name, theme, nav)
 
 
 def _vale(data: dict, fail) -> ValeConfig:

@@ -65,7 +65,7 @@ class InitTests:
             assert "!.codoc/scripts/" in ignore
             assert "!.codoc/scripts/**" in ignore
             assert "site/" in ignore
-            assert "mkdocs.yml" in ignore
+            assert ".codoc-engine.yml" in ignore
             out, err, code = _run_in(repo, ["status"])
         assert code in (0, None)
         assert err == ""

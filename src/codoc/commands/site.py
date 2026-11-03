@@ -26,6 +26,7 @@ class BuildResult:
     site_dir: Path
     config_file: Path
     binary: str
+    notes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +38,7 @@ class ServeResult:
     config_file: Path
     binary: str
     dev_addr: str
+    notes: tuple[str, ...] = ()
 
 
 def run_build(start: Path | None = None) -> BuildResult:
@@ -58,6 +60,7 @@ def run_build(start: Path | None = None) -> BuildResult:
         site_dir=Path(config.engine.site_dir),
         config_file=paths.engine,
         binary=binary,
+        notes=paths.notes,
     )
 
 
@@ -97,6 +100,7 @@ def run_serve(start: Path | None = None) -> ServeResult:
         config_file=paths.engine,
         binary=binary,
         dev_addr=_DEFAULT_DEV_ADDR,
+        notes=paths.notes,
     )
 
 
