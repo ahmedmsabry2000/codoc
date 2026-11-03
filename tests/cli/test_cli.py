@@ -1,33 +1,14 @@
 import io
 import os
-import subprocess
-from collections.abc import Iterator
-from contextlib import contextmanager, redirect_stderr, redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 import pytest
 
 import codoc.cli as cli
 from codoc.discover import git_root
-from tests.support.tmpdir import temporary_directory
-
-
-def _write(path: Path, text: str = "") -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text)
-
-
-@contextmanager
-def _git_repo() -> Iterator[Path]:
-    with temporary_directory() as root:
-        subprocess.run(
-            ["git", "init", "-q"],
-            cwd=root,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        yield root
+from tests.support.fs import write_text
+from tests.support.git import git_repository
 
 
 def _run_status_in(path: Path) -> tuple[str, str, int | None, Path]:
@@ -75,12 +56,12 @@ class CliTests:
             assert stderr.getvalue() == f"codoc {command.name}: not implemented\n"
 
     def test_status_prints_tsv_and_exits_zero(self) -> None:
-        with _git_repo() as repo:
-            _write(repo / "codoc.yaml")
-            _write(repo / "codoc.spec.yaml")
-            _write(repo / "src" / "my_project" / "codoc.spec.yaml")
-            _write(repo / "src" / "my_project" / "api" / "codoc.spec.yaml")
-            _write(repo / "src" / "my_project" / "cli" / "codoc.spec.yaml")
+        with git_repository() as repo:
+            write_text(repo / "codoc.yaml")
+            write_text(repo / "codoc.spec.yaml")
+            write_text(repo / "src" / "my_project" / "codoc.spec.yaml")
+            write_text(repo / "src" / "my_project" / "api" / "codoc.spec.yaml")
+            write_text(repo / "src" / "my_project" / "cli" / "codoc.spec.yaml")
             stdout, stderr, code, _cwd = _run_status_in(repo)
         assert code is None
         assert stderr == ""
@@ -97,22 +78,21 @@ class CliTests:
         )
 
     def test_status_with_no_specs_prints_the_header(self) -> None:
-        with _git_repo() as repo:
-            _write(repo / "codoc.yaml")
+        with git_repository() as repo:
+            write_text(repo / "codoc.yaml")
             stdout, stderr, code, _cwd = _run_status_in(repo)
         assert code is None
         assert stderr == ""
         assert stdout == "spec_path\tscope_dir\tpages\nregistry_pages\t0\n"
 
-    def test_status_outside_a_repo_exits_1(self) -> None:
-        with temporary_directory() as raw:
-            stdout, stderr, code, cwd = _run_status_in(Path(raw))
+    def test_status_outside_a_repo_exits_1(self, tmp_dir: Path) -> None:
+        stdout, stderr, code, cwd = _run_status_in(tmp_dir)
         assert code == 1
         assert stdout == ""
         assert stderr == f"codoc status: not a git repository at {cwd}\n"
 
     def test_status_without_codoc_yaml_exits_1(self) -> None:
-        with _git_repo() as repo:
+        with git_repository() as repo:
             root = git_root(repo)
             stdout, stderr, code, _cwd = _run_status_in(repo)
         assert code == 1
@@ -149,10 +129,10 @@ class CliTests:
                 "",
             )
         )
-        with _git_repo() as repo:
-            _write(repo / "codoc.yaml")
-            _write(repo / "codoc.spec.yaml", root_spec)
-            _write(repo / "src" / "my_project" / "cli" / "codoc.spec.yaml", spec)
+        with git_repository() as repo:
+            write_text(repo / "codoc.yaml")
+            write_text(repo / "codoc.spec.yaml", root_spec)
+            write_text(repo / "src" / "my_project" / "cli" / "codoc.spec.yaml", spec)
             stdout, stderr, code, _cwd = _run_status_in(repo)
         assert code is None
         assert stderr == ""
@@ -167,8 +147,8 @@ class CliTests:
         )
 
     def test_status_unknown_project_key_exits_1(self) -> None:
-        with _git_repo() as repo:
-            _write(repo / "codoc.yaml", "serve: true\n")
+        with git_repository() as repo:
+            write_text(repo / "codoc.yaml", "serve: true\n")
             root = git_root(repo)
             stdout, stderr, code, _cwd = _run_status_in(repo)
         assert code == 1
@@ -185,9 +165,9 @@ class CliTests:
                 "",
             )
         )
-        with _git_repo() as repo:
-            _write(repo / "codoc.yaml")
-            _write(repo / "codoc.spec.yaml", spec)
+        with git_repository() as repo:
+            write_text(repo / "codoc.yaml")
+            write_text(repo / "codoc.spec.yaml", spec)
             root = git_root(repo)
             stdout, stderr, code, _cwd = _run_status_in(repo)
         assert code == 1
@@ -208,10 +188,10 @@ class CliTests:
                 "",
             )
         )
-        with _git_repo() as repo:
-            _write(repo / "codoc.yaml")
-            _write(repo / "codoc.spec.yaml", spec)
-            _write(repo / "src" / "codoc.spec.yaml", spec)
+        with git_repository() as repo:
+            write_text(repo / "codoc.yaml")
+            write_text(repo / "codoc.spec.yaml", spec)
+            write_text(repo / "src" / "codoc.spec.yaml", spec)
             root = git_root(repo)
             stdout, stderr, code, _cwd = _run_status_in(repo)
         earlier = root / "codoc.spec.yaml"

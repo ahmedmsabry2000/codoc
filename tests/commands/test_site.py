@@ -1,49 +1,14 @@
-import io
 import os
 import shutil
 import subprocess
-from collections.abc import Iterator
-from contextlib import contextmanager, redirect_stderr, redirect_stdout
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-import codoc.cli as cli
 from codoc.commands.init import run_init
 from codoc.commands.site import SiteError, run_build, run_serve, stop_serve
-from tests.support.tmpdir import temporary_directory
-
-
-@contextmanager
-def _git_repo() -> Iterator[Path]:
-    with temporary_directory() as root:
-        subprocess.run(
-            ["git", "init", "-q"],
-            cwd=root,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        yield root
-
-
-def _run_in(path: Path, argv: list[str]) -> tuple[str, str, int | None]:
-    previous = os.getcwd()
-    os.chdir(path)
-    stdout = io.StringIO()
-    stderr = io.StringIO()
-    code: int | None = None
-    try:
-        with redirect_stdout(stdout), redirect_stderr(stderr):
-            try:
-                cli.main(argv)
-            except SystemExit as caught:
-                status = caught.code
-                code = status if isinstance(status, int) else None
-        return stdout.getvalue(), stderr.getvalue(), code
-    finally:
-        os.chdir(previous)
+from tests.support.cli import run_cli
+from tests.support.git import git_repository
 
 
 def _patch_engine_run(completed: MagicMock):
@@ -70,7 +35,7 @@ def _patch_engine_popen(proc: MagicMock):
 
 class SiteCmdTests:
     def test_build_invokes_zensical_with_generated_config(self) -> None:
-        with _git_repo() as repo:
+        with git_repository() as repo:
             run_init(repo)
             completed = MagicMock(returncode=0)
             with (
@@ -95,7 +60,7 @@ class SiteCmdTests:
             assert (repo / ".codoc-engine.yml").is_file()
 
     def test_build_missing_binary(self) -> None:
-        with _git_repo() as repo:
+        with git_repository() as repo:
             run_init(repo)
             with (
                 patch("codoc.commands.site.shutil.which", return_value=None),
@@ -105,7 +70,7 @@ class SiteCmdTests:
             assert "zensical not found on PATH" in str(caught.value)
 
     def test_build_uses_mkdocs_when_configured(self) -> None:
-        with _git_repo() as repo:
+        with git_repository() as repo:
             (repo / "codoc.yaml").write_text(
                 "engine:\n  name: mkdocs\n",
                 encoding="utf-8",
@@ -130,7 +95,7 @@ class SiteCmdTests:
             ]
 
     def test_serve_writes_pidfile_and_log(self) -> None:
-        with _git_repo() as repo:
+        with git_repository() as repo:
             run_init(repo)
             proc = MagicMock()
             proc.pid = 4242
@@ -160,7 +125,7 @@ class SiteCmdTests:
             assert (repo / result.log_file).is_file()
 
     def test_serve_replaces_existing_pid(self) -> None:
-        with _git_repo() as repo:
+        with git_repository() as repo:
             run_init(repo)
             pid_path = repo / ".codoc" / "serve.pid"
             pid_path.parent.mkdir(parents=True, exist_ok=True)
@@ -179,29 +144,29 @@ class SiteCmdTests:
             assert pid_path.read_text(encoding="utf-8") == "222\n"
 
     def test_cli_build_prints_site_dir(self) -> None:
-        with _git_repo() as repo:
+        with git_repository() as repo:
             run_init(repo)
             completed = MagicMock(returncode=0)
             with (
                 patch("codoc.commands.site.shutil.which", return_value="/bin/zensical"),
                 _patch_engine_run(completed),
             ):
-                out, err, code = _run_in(repo, ["build"])
+                out, err, code = run_cli(repo, ["build"])
         assert code is None
         assert out == "site\n"
         assert err == ""
 
     def test_cli_build_missing_binary_exits_1(self) -> None:
-        with _git_repo() as repo:
+        with git_repository() as repo:
             run_init(repo)
             with patch("codoc.commands.site.shutil.which", return_value=None):
-                out, err, code = _run_in(repo, ["build"])
+                out, err, code = run_cli(repo, ["build"])
         assert code == 1
         assert out == ""
         assert "zensical not found on PATH" in err
 
     def test_cli_serve_prints_pid_and_url(self) -> None:
-        with _git_repo() as repo:
+        with git_repository() as repo:
             run_init(repo)
             proc = MagicMock()
             proc.pid = 99
@@ -210,7 +175,7 @@ class SiteCmdTests:
                 patch("codoc.commands.site.shutil.which", return_value="/bin/zensical"),
                 _patch_engine_popen(proc),
             ):
-                out, err, code = _run_in(repo, ["serve"])
+                out, err, code = run_cli(repo, ["serve"])
         assert code is None
         assert err == ""
         assert "pid\t99\n" in out
@@ -219,12 +184,12 @@ class SiteCmdTests:
         assert "pidfile\t.codoc/serve.pid\n" in out
 
     def test_stop_serve_without_pidfile(self) -> None:
-        with _git_repo() as repo:
+        with git_repository() as repo:
             assert not stop_serve(repo)
 
     @pytest.mark.skipif(not shutil.which("zensical"), reason="zensical not on PATH")
     def test_live_zensical_build(self) -> None:
-        with _git_repo() as repo:
+        with git_repository() as repo:
             run_init(repo)
             result = run_build(repo)
             assert (repo / result.site_dir / "index.html").is_file()

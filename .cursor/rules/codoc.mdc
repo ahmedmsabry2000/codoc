@@ -3,6 +3,14 @@ description: How to edit the Codoc tool package
 alwaysApply: true
 ---
 
-Read `AGENTS.md` before editing this repo.
+# Codoc package
 
-This repository is the Codoc Python package (`codoc` CLI). Keep changes scoped to the requested work. Do not add empty placeholder packages. Do not put roadmap, ticket, milestone, or product-vision text into rules, comments, README, or other repo files. Command names and aliases live only in `COMMANDS` in `src/codoc/cli/`. After a feature PR merges, delete the local branch and prune remote-tracking refs.
+This repository is the Codoc Python package (`codoc` CLI).
+
+- Keep changes scoped to the requested work.
+- Unknown work stays out of the tree. Add a module when implementing it, not as an empty placeholder.
+- Do not put roadmap, ticket, milestone, or product-vision text into rules, comments, README, commit messages that narrate a plan, or other repo files.
+- Put CLI command names and aliases only in `COMMANDS` in `src/codoc/cli/`.
+- Keep package code under `src/codoc/{cli,commands,config,discover,engine,model}/`. Mirror that layout under `tests/`.
+
+Agent guidance source of truth is `.cursor/rules/`. `AGENTS.md` is an index that points here.
