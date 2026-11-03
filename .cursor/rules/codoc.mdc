@@ -3,14 +3,14 @@ description: How to edit the Codoc tool package
 alwaysApply: true
 ---
 
-Read `AGENTS.md` before editing this repo.
+# Codoc package
 
-This repository is the Codoc Python package (`codoc` CLI). Keep changes scoped to the requested work. Do not add empty placeholder packages. Do not put roadmap, ticket, milestone, or product-vision text into rules, comments, README, or other repo files. Command names and aliases live only in `COMMANDS` in `src/codoc/cli/`.
+This repository is the Codoc Python package (`codoc` CLI).
 
-## Git branches
+- Keep changes scoped to the requested work.
+- Unknown work stays out of the tree. Add a module when implementing it, not as an empty placeholder.
+- Do not put roadmap, ticket, milestone, or product-vision text into rules, comments, README, commit messages that narrate a plan, or other repo files.
+- Put CLI command names and aliases only in `COMMANDS` in `src/codoc/cli/`.
+- Keep package code under `src/codoc/{cli,commands,config,discover,engine,model}/`. Mirror that layout under `tests/`.
 
-Use short descriptive branch names (for example `engine-shim` or `pytest-fixtures`). Never create branches whose names start with `cursor/`. After a feature PR merges, delete the local branch and prune remote-tracking refs.
-
-## Tests
-
-Use pytest. Put shared fixtures in `tests/conftest.py` and reusable helpers under `tests/support/`. Prefer fixtures over copied setup (`git_repo`, `tmp_dir`, `run_cli`, `git_repository`, `yaml_file`). Prefer `@pytest.mark.parametrize` when several inputs share the same assertions. Avoid duplicating `_git_repo` / tempdir / CLI runners inside individual test modules.
+Agent guidance source of truth is `.cursor/rules/`. `AGENTS.md` is an index that points here.

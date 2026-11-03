@@ -1,0 +1,14 @@
+---
+description: Codoc pytest layout and fixture conventions
+globs: tests/**/*.py
+alwaysApply: false
+---
+
+# Tests
+
+- Use pytest.
+- Put shared fixtures in `tests/conftest.py` and reusable helpers under `tests/support/`.
+- Prefer fixtures over copied setup (`git_repo`, `tmp_dir`, `run_cli`, `git_repository`, `yaml_file`).
+- Prefer `@pytest.mark.parametrize` when several inputs share the same assertions.
+- Avoid duplicating `_git_repo` / tempdir / CLI runners inside individual test modules.
+- Keep test tempdirs outside the Codoc checkout package paths.
