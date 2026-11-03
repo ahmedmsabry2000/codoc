@@ -4,6 +4,7 @@ import os
 import shutil
 import signal
 import subprocess
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -138,11 +139,18 @@ def _resolve_binary(engine_name: str) -> str:
     name = engine_name.lower()
     if name not in {"zensical", "mkdocs"}:
         raise SiteError(f"unsupported engine {engine_name!r}")
-    # Prefer the binary that matches codoc.yaml; no silent mkdocs fallback.
-    found = shutil.which(name)
-    if found is None:
-        raise SiteError(f"{name} not found on PATH")
-    return name
+    # Prefer PATH (return the short name so PATH resolution still applies),
+    # then the active environment's bin/ (uv / pipx / venv). Do not resolve
+    # sys.executable — uv often symlinks it to a shared CPython install.
+    if shutil.which(name) is not None:
+        return name
+    for candidate in (
+        Path(sys.prefix) / "bin" / name,
+        Path(sys.executable).parent / name,
+    ):
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return os.fspath(candidate)
+    raise SiteError(f"{name} not found on PATH")
 
 
 def _terminate(pid: int) -> bool:

@@ -104,7 +104,12 @@ def _ensure_auto(
         body = f"# {page.id}\n\nAuto-generated page with no script configured.\n"
     body = body.rstrip() + "\n"
     extras = "\n".join(
-        block for block in (sources_block(source_paths), link_blocks(page, registry)) if block
+        block
+        for block in (
+            sources_block(page.path, source_paths),
+            link_blocks(page, registry),
+        )
+        if block
     )
     if extras:
         body = body.rstrip() + "\n\n" + extras
@@ -156,7 +161,7 @@ def _ensure_trailing_sections(
 ) -> str:
     extras: list[str] = []
     if "## Sources" not in body:
-        block = sources_block(source_paths)
+        block = sources_block(page.path, source_paths)
         if block:
             extras.append(block.rstrip())
     if "## See also" not in body and "## Original page" not in body:

@@ -47,20 +47,16 @@ def link_blocks(page: Page, registry: PageRegistry) -> str:
     return "\n".join(chunks).rstrip() + "\n"
 
 
-def sources_block(sources: tuple[str, ...]) -> str:
-    """Return a Sources footer for repo-relative paths."""
+def sources_block(from_path: str, sources: tuple[str, ...]) -> str:
+    """Return a Sources footer with hrefs relative to the docs page."""
     if not sources:
         return ""
     lines = ["## Sources\n"]
     for path in sources:
         name = PurePosixPath(path).name
-        lines.append(f"- [`{name}`]({_repo_href(path)})\n")
+        href = relative_href(from_path, path)
+        lines.append(f"- [`{name}`]({href})\n")
     return "\n".join(lines)
-
-
-def _repo_href(path: str) -> str:
-    """Href from a docs page is left as a repo-root-relative path for MVP."""
-    return path
 
 
 def _label(page_id: str, label: str | None) -> str:
