@@ -31,6 +31,7 @@ def ensure_page(
     scope_dir: Path,
     registry: PageRegistry,
     source_paths: tuple[str, ...] = (),
+    scripts_dir: str = ".codoc/scripts",
 ) -> PageOutcome:
     """
     Ensure one page on disk according to its type.
@@ -48,9 +49,11 @@ def ensure_page(
     if page.type == "manual":
         return _ensure_manual(abs_path, page, meta)
     if page.type == "hybrid":
-        return _ensure_hybrid(root, abs_path, page, scope_dir, registry, meta, source_paths)
+        return _ensure_hybrid(root, abs_path, page, scope_dir, meta, scripts_dir)
     if page.type == "auto-generated":
-        return _ensure_auto(root, abs_path, page, scope_dir, registry, meta, source_paths)
+        return _ensure_auto(
+            root, abs_path, page, scope_dir, registry, meta, source_paths, scripts_dir
+        )
     raise ScriptError(f"unsupported page type {page.type!r}")
 
 
@@ -60,7 +63,7 @@ def _ensure_manual(path: Path, page: Page, meta: CodocFrontmatter) -> PageOutcom
         return PageOutcome(page.id, Path(page.path), "created")
     text = path.read_text(encoding="utf-8")
     split = split_frontmatter(text)
-    write_doc(path, meta, split.body)
+    write_doc(path, meta, split.body, existing=split.mapping)
     return PageOutcome(page.id, Path(page.path), "frontmatter")
 
 
@@ -69,18 +72,19 @@ def _ensure_hybrid(
     path: Path,
     page: Page,
     scope_dir: Path,
-    registry: PageRegistry,
     meta: CodocFrontmatter,
-    source_paths: tuple[str, ...],
+    scripts_dir: str,
 ) -> PageOutcome:
     existed = path.is_file()
+    existing: dict | None = None
     if existed:
-        body = split_frontmatter(path.read_text(encoding="utf-8")).body
+        split = split_frontmatter(path.read_text(encoding="utf-8"))
+        body = split.body
+        existing = split.mapping
     else:
         body = _hybrid_stub(page)
-    body = _inject_placeholders(root, body, page, scope_dir)
-    body = _ensure_trailing_sections(body, page, registry, source_paths)
-    write_doc(path, meta, body)
+    body = _inject_placeholders(root, body, page, scope_dir, scripts_dir)
+    write_doc(path, meta, body, existing=existing)
     return PageOutcome(page.id, Path(page.path), "injected" if existed else "created")
 
 
@@ -92,6 +96,7 @@ def _ensure_auto(
     registry: PageRegistry,
     meta: CodocFrontmatter,
     source_paths: tuple[str, ...],
+    scripts_dir: str,
 ) -> PageOutcome:
     if page.script:
         body = run_script(
@@ -99,6 +104,7 @@ def _ensure_auto(
             page.script,
             page_id=page.id,
             scope_dir=scope_dir,
+            scripts_dir=scripts_dir,
         )
     else:
         body = f"# {page.id}\n\nAuto-generated page with no script configured.\n"
@@ -131,43 +137,32 @@ def _inject_placeholders(
     body: str,
     page: Page,
     scope_dir: Path,
+    scripts_dir: str,
 ) -> str:
     scripts_by_id = {item.id: item.script for item in page.placeholders}
     if not scripts_by_id:
         return body
+
+    found: set[str] = set()
 
     def replace_pair(match: re.Match[str]) -> str:
         open_tag, placeholder_id, _old, close_tag = match.groups()
         script = scripts_by_id.get(placeholder_id)
         if script is None:
             return match.group(0)
+        found.add(placeholder_id)
         fragment = run_script(
             root,
             script,
             page_id=page.id,
             scope_dir=scope_dir,
+            scripts_dir=scripts_dir,
             placeholder_id=placeholder_id,
         ).rstrip("\n")
         return f"{open_tag}\n{fragment}\n{close_tag}"
 
-    return _PLACEHOLDER_PAIR.sub(replace_pair, body)
-
-
-def _ensure_trailing_sections(
-    body: str,
-    page: Page,
-    registry: PageRegistry,
-    source_paths: tuple[str, ...],
-) -> str:
-    extras: list[str] = []
-    if "## Sources" not in body:
-        block = sources_block(page.path, source_paths)
-        if block:
-            extras.append(block.rstrip())
-    if "## See also" not in body and "## Original page" not in body:
-        block = link_blocks(page, registry)
-        if block:
-            extras.append(block.rstrip())
-    if not extras:
-        return body
-    return body.rstrip() + "\n\n" + "\n\n".join(extras) + "\n"
+    updated = _PLACEHOLDER_PAIR.sub(replace_pair, body)
+    missing = sorted(set(scripts_by_id) - found)
+    if missing:
+        raise ScriptError(f"placeholder marker missing: {missing[0]}")
+    return updated

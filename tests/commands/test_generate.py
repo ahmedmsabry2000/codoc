@@ -174,6 +174,122 @@ class GenerateTests:
         with pytest.raises(GenerateError, match="script not found"):
             run_generate(git_repo)
 
+    def test_manual_preserves_sibling_frontmatter_keys(self, git_repo: Path) -> None:
+        write_text(git_repo / "codoc.yaml", _project_yaml())
+        write_text(
+            git_repo / "src" / "demo" / "codoc.spec.yaml",
+            "docs:\n  - id: guide\n    type: manual\n    path: docs/guide.md\n",
+        )
+        write_text(
+            git_repo / "docs" / "guide.md",
+            "\n".join(
+                (
+                    "---",
+                    "title: Keep",
+                    "description: stays",
+                    "codoc:",
+                    "  id: stale",
+                    "  type: manual",
+                    "---",
+                    "",
+                    "# Keep me",
+                    "",
+                )
+            ),
+        )
+        run_generate(git_repo)
+        text = (git_repo / "docs" / "guide.md").read_text(encoding="utf-8")
+        assert "title: Keep" in text
+        assert "description: stays" in text
+        split = split_frontmatter(text)
+        assert split.frontmatter is not None
+        assert split.frontmatter.id == "guide"
+
+    def test_hybrid_missing_marker_fails_without_rewrite(self, git_repo: Path) -> None:
+        script = _write_script(git_repo, "inject.py", 'print("new")\n')
+        write_text(git_repo / "codoc.yaml", _project_yaml())
+        write_text(
+            git_repo / "src" / "demo" / "codoc.spec.yaml",
+            "\n".join(
+                (
+                    "docs:",
+                    "  - id: loop",
+                    "    type: hybrid",
+                    "    path: docs/loop.md",
+                    "    placeholders:",
+                    "      - id: command-table",
+                    f"        script: {script}",
+                )
+            ),
+        )
+        original = "# Loop\n\nNo marker here.\n"
+        write_text(git_repo / "docs" / "loop.md", original)
+        with pytest.raises(GenerateError, match="placeholder marker missing"):
+            run_generate(git_repo)
+        assert (git_repo / "docs" / "loop.md").read_text(encoding="utf-8") == original
+
+    def test_hybrid_does_not_append_link_footers(self, git_repo: Path) -> None:
+        script = _write_script(git_repo, "inject.py", 'print("table")\n')
+        write_text(git_repo / "codoc.yaml", _project_yaml())
+        write_text(
+            git_repo / "src" / "demo" / "codoc.spec.yaml",
+            "\n".join(
+                (
+                    "docs:",
+                    "  - id: guide",
+                    "    type: manual",
+                    "    path: docs/guide.md",
+                    "  - id: loop",
+                    "    type: hybrid",
+                    "    path: docs/loop.md",
+                    "    canonical: guide",
+                    "    links:",
+                    "      - id: guide",
+                    "    placeholders:",
+                    "      - id: command-table",
+                    f"        script: {script}",
+                )
+            ),
+        )
+        write_text(git_repo / "docs" / "guide.md", "# Guide\n")
+        write_text(
+            git_repo / "docs" / "loop.md",
+            "\n".join(
+                (
+                    "# Loop",
+                    "",
+                    '<!-- codoc:placeholder id="command-table" -->',
+                    "",
+                    "<!-- /codoc:placeholder -->",
+                    "",
+                )
+            ),
+        )
+        run_generate(git_repo)
+        text = (git_repo / "docs" / "loop.md").read_text(encoding="utf-8")
+        assert "table" in text
+        assert "## See also" not in text
+        assert "## Original page" not in text
+        assert "## Sources" not in text
+
+    def test_script_outside_scripts_dir_fails(self, git_repo: Path) -> None:
+        write_text(git_repo / "codoc.yaml", _project_yaml())
+        write_text(git_repo / "evil.py", 'print("nope")\n')
+        write_text(
+            git_repo / "src" / "demo" / "codoc.spec.yaml",
+            "\n".join(
+                (
+                    "docs:",
+                    "  - id: api",
+                    "    type: auto-generated",
+                    "    path: docs/api.md",
+                    "    script: evil.py",
+                )
+            ),
+        )
+        with pytest.raises(GenerateError, match="script outside scripts_dir"):
+            run_generate(git_repo)
+
 
 @pytest.mark.parametrize(
     ("from_path", "to_path", "expected"),

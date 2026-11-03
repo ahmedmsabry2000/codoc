@@ -6,6 +6,7 @@ from pathlib import Path
 from codoc.config import ConfigError, load_project_config
 from codoc.discover import DiscoverError, SpecUnit, discover, git_root
 from codoc.generate.ensure import PageOutcome, ensure_page
+from codoc.generate.frontmatter import FrontmatterError
 from codoc.generate.scripts import ScriptError
 from codoc.model.registry import build_page_registry
 from codoc.model.spec import CoverageBlock, SpecDocument, SpecError, load_spec
@@ -27,7 +28,7 @@ def run_generate(start: Path | None = None) -> GenerateResult:
         start = Path.cwd()
     try:
         root = git_root(start)
-        load_project_config(root / "codoc.yaml")
+        config = load_project_config(root / "codoc.yaml")
         units = discover(root)
         loaded: list[tuple[SpecUnit, SpecDocument]] = []
         for unit in units:
@@ -44,9 +45,10 @@ def run_generate(start: Path | None = None) -> GenerateResult:
                         scope_dir=unit.scope_dir,
                         registry=registry,
                         source_paths=sources_by_page.get(page.id, ()),
+                        scripts_dir=config.paths.scripts_dir,
                     )
                 )
-    except (DiscoverError, ConfigError, SpecError, ScriptError) as err:
+    except (DiscoverError, ConfigError, SpecError, ScriptError, FrontmatterError) as err:
         raise GenerateError(str(err)) from err
     return GenerateResult(root=root, pages=tuple(outcomes))
 
@@ -73,17 +75,21 @@ def _expand_coverage_paths(
     """Expand coverage globs under the scope dir into repo-relative paths."""
     base = root / scope_dir
     found: list[str] = []
+    seen: set[str] = set()
     for pattern in block.paths:
         if any(char in pattern for char in "*?["):
             matches = sorted(base.glob(pattern))
             for match in matches:
                 if match.is_file():
-                    found.append(match.relative_to(root).as_posix())
+                    rel = match.relative_to(root).as_posix()
+                    if rel not in seen:
+                        seen.add(rel)
+                        found.append(rel)
         else:
             candidate = base / pattern
             if candidate.is_file():
-                found.append(candidate.relative_to(root).as_posix())
-            else:
-                found.append((scope_dir / pattern).as_posix())
-    # Cap Sources footers so large packages stay readable.
-    return tuple(found[:20])
+                rel = candidate.relative_to(root).as_posix()
+                if rel not in seen:
+                    seen.add(rel)
+                    found.append(rel)
+    return tuple(found)
