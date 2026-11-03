@@ -50,7 +50,6 @@ class CodegenTests:
             assert "site_dir: site" in engine
             assert result.engine.as_posix() == ".codoc-engine.yml"
             assert (repo / ".codoc-engine.yml").is_file()
-            assert not (repo / "mkdocs.yml").exists()
             assert result.vale_ini is not None
             vale = (repo / result.vale_ini).read_text(encoding="utf-8")
             assert "Vocab = Codoc" in vale

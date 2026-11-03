@@ -66,7 +66,7 @@ class CleanCmdTests:
             assert not result.stopped_serve
             assert not (repo / "site").exists()
             assert not (repo / ".codoc-engine.yml").exists()
-            assert not (repo / "mkdocs.yml").exists()
+            assert (repo / "mkdocs.yml").is_file()
             assert not (repo / ".codoc" / "generated").exists()
             assert not (repo / ".codoc" / "cache").exists()
             assert not (repo / ".codoc" / "logs").exists()
@@ -74,7 +74,7 @@ class CleanCmdTests:
             assert (repo / ".codoc" / "scripts" / ".gitkeep").is_file()
             assert Path("site") in result.removed
             assert Path(".codoc-engine.yml") in result.removed
-            assert Path("mkdocs.yml") in result.removed
+            assert Path("mkdocs.yml") not in result.removed
 
     def test_clean_uses_configured_site_dir(self) -> None:
         with _git_repo() as repo:

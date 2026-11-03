@@ -93,7 +93,6 @@ class SiteCmdTests:
             assert os.path.samefile(engine_calls[0].kwargs["cwd"], repo)
             assert result.site_dir.as_posix() == "site"
             assert (repo / ".codoc-engine.yml").is_file()
-            assert not (repo / "mkdocs.yml").exists()
 
     def test_build_missing_binary(self) -> None:
         with _git_repo() as repo:

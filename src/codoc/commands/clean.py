@@ -9,7 +9,6 @@ from codoc.config import ConfigError, load_project_config
 from codoc.discover import DiscoverError, git_root
 from codoc.engine.codegen import ENGINE_SHIM
 
-_LEGACY_ENGINE_FILE = Path("mkdocs.yml")
 _GENERATED_DIR = Path(".codoc") / "generated"
 _RUNTIME_DIRS = (
     Path(".codoc") / "cache",
@@ -51,10 +50,10 @@ def run_clean(start: Path | None = None) -> CleanResult:
 
     stopped = stop_serve(root)
     removed: list[Path] = []
+    # Do not remove root mkdocs.yml / zensical.yml — those are user files (engulf keeps them).
     for rel in (
         site_dir,
         ENGINE_SHIM,
-        _LEGACY_ENGINE_FILE,
         _GENERATED_DIR,
         *_RUNTIME_DIRS,
         _PID_FILE,

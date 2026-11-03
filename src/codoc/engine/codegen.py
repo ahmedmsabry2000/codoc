@@ -7,13 +7,13 @@ from pathlib import Path
 
 from codoc.config import ConfigError, ProjectConfig, load_project_config
 from codoc.discover import DiscoverError, git_root
+from codoc.engine.engulf import EngulfError, engulf_project
 
 _GENERATED_DIR = Path(".codoc") / "generated"
 # Zensical treats the config file's directory as the project root and rejects
 # docs_dir/site_dir that use '..'. Absolute site_dir also fails. So the shim
 # must sit at the git root — but it is not named mkdocs.yml and is not SoT.
 ENGINE_SHIM = Path(".codoc-engine.yml")
-_LEGACY_ENGINE_FILE = Path("mkdocs.yml")
 _VALE_INI = _GENERATED_DIR / ".vale.ini"
 _VOCAB_DIR = _GENERATED_DIR / "styles" / "Vocab" / "Codoc"
 _ACCEPT = _VOCAB_DIR / "accept.txt"
@@ -36,6 +36,7 @@ class GeneratedPaths:
     vale_ini: Path | None
     vocab_accept: Path | None
     written: tuple[Path, ...]
+    notes: tuple[str, ...] = ()
 
 
 def ensure_generated(start: Path | None = None) -> GeneratedPaths:
@@ -53,10 +54,22 @@ def ensure_generated(start: Path | None = None) -> GeneratedPaths:
         config = load_project_config(project_path)
     except ConfigError as err:
         raise CodegenError(str(err)) from err
-    return write_generated(root, config)
+    try:
+        outcome = engulf_project(
+            root, config, fill_defaults_only=True, project_path=project_path
+        )
+    except EngulfError as err:
+        raise CodegenError(str(err)) from err
+    notes = (outcome.note,) if outcome.note else ()
+    return write_generated(root, outcome.config, notes=notes)
 
 
-def write_generated(root: Path, config: ProjectConfig) -> GeneratedPaths:
+def write_generated(
+    root: Path,
+    config: ProjectConfig,
+    *,
+    notes: tuple[str, ...] = (),
+) -> GeneratedPaths:
     """Materialize the engine shim and Vale files from ProjectConfig."""
     name = config.engine.name.lower()
     if name not in {"zensical", "mkdocs"}:
@@ -67,8 +80,7 @@ def write_generated(root: Path, config: ProjectConfig) -> GeneratedPaths:
     engine_text = _render_engine(config)
     _atomic_write(root / engine_rel, engine_text)
     written.append(engine_rel)
-    # Drop the old root mkdocs.yml so it cannot look like a second config.
-    (root / _LEGACY_ENGINE_FILE).unlink(missing_ok=True)
+    # Legacy mkdocs.yml / zensical.yml are left in place after engulf into codoc.yaml.
 
     vale_ini: Path | None = None
     vocab_accept: Path | None = None
@@ -91,6 +103,7 @@ def write_generated(root: Path, config: ProjectConfig) -> GeneratedPaths:
         vale_ini=vale_ini,
         vocab_accept=vocab_accept,
         written=ordered,
+        notes=notes,
     )
 
 
