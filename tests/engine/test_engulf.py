@@ -157,9 +157,7 @@ class InitEngulfTests:
                 encoding="utf-8",
             )
             result = run_init(repo)
-            assert any(
-                "imported engine settings from zensical.yml" in n for n in result.notes
-            )
+            assert any("imported engine settings from zensical.yml" in n for n in result.notes)
             assert any("moved zensical.yml" in n for n in result.notes)
             assert not (repo / "zensical.yml").exists()
             assert (repo / IMPORTED_DIR / "zensical.yml").is_file()

@@ -122,9 +122,7 @@ def engulf_project(
     if picked is not None:
         source, engine_name = picked
         legacy = read_legacy_engine(source, engine_name)
-        merged = _merge_engine(
-            config.engine, legacy, fill_defaults_only=fill_defaults_only
-        )
+        merged = _merge_engine(config.engine, legacy, fill_defaults_only=fill_defaults_only)
         if merged != config.engine:
             updated = replace(config, engine=merged)
             target = project_path if project_path is not None else root / "codoc.yaml"
@@ -185,17 +183,9 @@ def _merge_engine(
     if not fill_defaults_only:
         return legacy
     name = legacy.name if current.name == defaults.name else current.name
-    docs_dir = (
-        legacy.docs_dir if current.docs_dir == defaults.docs_dir else current.docs_dir
-    )
-    site_dir = (
-        legacy.site_dir if current.site_dir == defaults.site_dir else current.site_dir
-    )
-    site_name = (
-        legacy.site_name
-        if current.site_name == defaults.site_name
-        else current.site_name
-    )
+    docs_dir = legacy.docs_dir if current.docs_dir == defaults.docs_dir else current.docs_dir
+    site_dir = legacy.site_dir if current.site_dir == defaults.site_dir else current.site_dir
+    site_name = legacy.site_name if current.site_name == defaults.site_name else current.site_name
     theme = legacy.theme if current.theme is None else current.theme
     nav = legacy.nav if current.nav is None else current.nav
     return EngineConfig(name, docs_dir, site_dir, site_name, theme, nav)

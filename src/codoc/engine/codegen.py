@@ -57,9 +57,7 @@ def ensure_generated(start: Path | None = None) -> GeneratedPaths:
     except ConfigError as err:
         raise CodegenError(str(err)) from err
     try:
-        outcome = engulf_project(
-            root, config, fill_defaults_only=True, project_path=project_path
-        )
+        outcome = engulf_project(root, config, fill_defaults_only=True, project_path=project_path)
     except EngulfError as err:
         raise CodegenError(str(err)) from err
     notes = (outcome.note,) if outcome.note else ()

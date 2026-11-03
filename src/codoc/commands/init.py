@@ -85,9 +85,7 @@ def run_init(start: Path | None = None, *, force: bool = False) -> InitResult:
     except EngulfError as err:
         raise InitError(str(err)) from err
     if legacy_source is not None:
-        notes.append(
-            f"imported engine settings from {legacy_source.name} into codoc.yaml"
-        )
+        notes.append(f"imported engine settings from {legacy_source.name} into codoc.yaml")
 
     written: list[Path] = []
 
