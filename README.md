@@ -1,47 +1,62 @@
 # Codoc
 
-Codoc is a local Python CLI. This repository is the installable tool package.
+Local Python CLI that turns nested `codoc.spec.yaml` files into a Zensical docs site under `docs/`.
 
 ## Install
 
-Requires [uv](https://docs.astral.sh/uv/).
+Requires [uv](https://docs.astral.sh/uv/) and Python 3.12+.
 
 ```bash
 uv sync
 uv run pre-commit install
 ```
 
-## Format and lint
+Optional tools used by commands:
+
+- [Zensical](https://github.com/zensical/zensical) for `build` / `serve` (`uv sync` installs it in this repo’s dev group)
+- [Vale](https://vale.sh/) on `PATH` for `lint` when `vale.enabled` is true
+
+## Develop
 
 ```bash
 uv run ruff format .
 uv run ruff check --fix .
-```
-
-Git hooks run the same checks on commit via pre-commit (`uv run pre-commit run --all-files`).
-
-## Test
-
-```bash
 uv run pytest
 ```
 
-## Run
+## Use
 
 ```bash
-uv run codoc
-uv run codoc --help
 uv run codoc init
-uv run codoc status
 uv run codoc recommend
+uv run codoc generate
+uv run codoc validate
 uv run codoc build
 uv run codoc serve
 uv run codoc lint
+uv run codoc status
 uv run codoc clean
-uv run codoc generate
-uv run codoc drift
 ```
 
-With no arguments, `codoc` prints help and exits 0. `codoc init` writes project files in a git repository. `codoc status` lists each `codoc.spec.yaml` in the git repo. The pages column is the number of pages in that spec. After those rows, status prints `registry_pages` and the count of page ids in every spec. `codoc recommend` lists `src/` packages (including nested packages with `__init__.py`) that lack a nested `codoc.spec.yaml`, writes `.codoc/index/packages.json`, and ranks with BYO `llm:` + env keys when available else `.py` file count (path + short rationale; recommend-only). `codoc generate` walks every `codoc.spec.yaml`, writes or updates `docs/` by page type (manual keeps body, hybrid injects placeholders, auto-generated runs `.codoc/scripts/`), and prints a TSV of page actions. `codoc validate` checks frontmatter mirrors, scripts, registry links, and broken Markdown links; lists git-changed coverage files; writes `.codoc/index/rag.json`; and may call a BYO LLM Stage D review when `llm:` + env keys are set. Engine settings live in `codoc.yaml` (`engine:` only — one user-facing project config). On `init` or adopt codegen, an existing root `zensical.yml` or `mkdocs.yml` is engulfed into that section (`docs_dir`, `site_dir`, `site_name`, `theme`, `nav`) and moved under `.codoc/imported/`. `codoc build` and `codoc serve` refresh a transient root `.codoc-engine.yml` shim from `codoc.yaml` (and Vale under `.codoc/generated/` when enabled), then run the configured binary (`zensical` by default; install it on `PATH`) as `<engine> build|serve -f .codoc-engine.yml`. Serve runs in the background and records `.codoc/serve.pid` plus `.codoc/logs/serve.log`. `codoc lint` refreshes those generated configs then runs `vale` against the docs dir (`vale` must be on `PATH`; set `vale.enabled: false` to skip). `codoc clean` stops serve if needed and removes `site/`, `.codoc-engine.yml`, `.codoc/generated/`, and other `.codoc` runtime dirs while keeping `.codoc/scripts/`. Commands that are not implemented yet print `codoc <name>: not implemented` to stderr and exit 2. `codoc drift` uses the same behavior as `validate`.
+`codoc drift` is an alias of `validate`.
 
-`uv run python -m codoc` calls the same entry point.
+Typical loop in a target repo:
+
+1. `codoc init` writes `codoc.yaml`, a starter nested spec, `docs/`, and `.codoc/scripts/`.
+2. Edit specs (`manual` / `hybrid` / `auto-generated` pages) and scripts under `.codoc/scripts/`.
+3. `codoc generate` writes docs by type (manual keeps body, hybrid injects placeholders, auto runs scripts).
+4. `codoc validate` checks frontmatter, links, scripts, git-changed coverage files, and writes `.codoc/index/rag.json`.
+5. `codoc build` / `codoc serve` refresh a transient `.codoc-engine.yml` from `codoc.yaml` and run Zensical.
+
+This repository dogfoods the same loop (`codoc.yaml` + `src/codoc/codoc.spec.yaml`).
+
+```bash
+uv run codoc generate
+uv run codoc validate
+uv run codoc build
+uv run codoc serve
+```
+
+Sibling demo: `../codoc-example`.
+
+`uv run python -m codoc` calls the same entry point as `uv run codoc`.
