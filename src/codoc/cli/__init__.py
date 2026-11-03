@@ -184,6 +184,8 @@ def _run_generate() -> None:
     except GenerateError as err:
         print(f"codoc generate: {err}", file=sys.stderr)
         raise SystemExit(1) from err
+    for note in result.notes:
+        print(f"codoc generate: {note}", file=sys.stderr)
     print("page_id\tpath\taction")
     for page in result.pages:
         print(f"{page.page_id}\t{page.path.as_posix()}\t{page.action}")

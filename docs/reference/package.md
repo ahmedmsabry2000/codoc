@@ -22,6 +22,7 @@ codoc:
   - path: src/codoc/engine/engulf.py
   - path: src/codoc/engine/vocab.py
   - path: src/codoc/generate/__init__.py
+  - path: src/codoc/generate/draft.py
   - path: src/codoc/generate/ensure.py
   - path: src/codoc/generate/frontmatter.py
   - path: src/codoc/generate/links.py
@@ -92,6 +93,8 @@ Top-level modules:
 - [`vocab.py`](../../src/codoc/engine/vocab.py)
 
 - [`__init__.py`](../../src/codoc/generate/__init__.py)
+
+- [`draft.py`](../../src/codoc/generate/draft.py)
 
 - [`ensure.py`](../../src/codoc/generate/ensure.py)
 

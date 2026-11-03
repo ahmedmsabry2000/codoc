@@ -153,7 +153,7 @@ class GenerateTests:
         )
         stdout, stderr, code = run_cli(git_repo, ["generate"])
         assert code is None
-        assert stderr == ""
+        assert "draft skipped" in stderr
         assert stdout.startswith("page_id\tpath\taction\n")
         assert "index\tdocs/index.md\tcreated\n" in stdout
 
@@ -271,6 +271,39 @@ class GenerateTests:
         assert "## See also" not in text
         assert "## Original page" not in text
         assert "## Sources" not in text
+
+    def test_offline_draft_skip_note_on_new_manual(self, git_repo: Path) -> None:
+        write_text(git_repo / "codoc.yaml", _project_yaml())
+        write_text(
+            git_repo / "src" / "demo" / "codoc.spec.yaml",
+            "docs:\n  - id: guide\n    type: manual\n    path: docs/guide.md\n",
+        )
+        stdout, stderr, code = run_cli(git_repo, ["generate"])
+        assert code is None
+        assert "draft skipped" in stderr
+        assert "guide\tdocs/guide.md\tcreated\n" in stdout
+        assert (git_repo / "docs" / "guide.md").is_file()
+
+    def test_llm_draft_used_for_new_manual(self, git_repo: Path, monkeypatch) -> None:
+        write_text(
+            git_repo / "codoc.yaml",
+            "engine:\n  name: zensical\nllm:\n  provider: openai\n  model: gpt-test\n",
+        )
+        write_text(
+            git_repo / "src" / "demo" / "codoc.spec.yaml",
+            "docs:\n  - id: guide\n    type: manual\n    path: docs/guide.md\n",
+        )
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+        def fake_chat(**_kwargs: object) -> str:
+            return "# Drafted\n\nFrom the model.\n"
+
+        monkeypatch.setattr("codoc.generate.draft.chat_completion", fake_chat)
+        result = run_generate(git_repo)
+        assert result.pages[0].action == "created"
+        text = (git_repo / "docs" / "guide.md").read_text(encoding="utf-8")
+        assert "From the model." in text
+        assert not any("draft skipped" in note for note in result.notes)
 
     def test_script_outside_scripts_dir_fails(self, git_repo: Path) -> None:
         write_text(git_repo / "codoc.yaml", _project_yaml())

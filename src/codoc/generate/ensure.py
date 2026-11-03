@@ -32,6 +32,7 @@ def ensure_page(
     registry: PageRegistry,
     source_paths: tuple[str, ...] = (),
     scripts_dir: str = ".codoc/scripts",
+    draft_body: str | None = None,
 ) -> PageOutcome:
     """
     Ensure one page on disk according to its type.
@@ -47,9 +48,11 @@ def ensure_page(
         sources=tuple(SourceRef(path) for path in source_paths),
     )
     if page.type == "manual":
-        return _ensure_manual(abs_path, page, meta)
+        return _ensure_manual(abs_path, page, meta, draft_body=draft_body)
     if page.type == "hybrid":
-        return _ensure_hybrid(root, abs_path, page, scope_dir, meta, scripts_dir)
+        return _ensure_hybrid(
+            root, abs_path, page, scope_dir, meta, scripts_dir, draft_body=draft_body
+        )
     if page.type == "auto-generated":
         return _ensure_auto(
             root, abs_path, page, scope_dir, registry, meta, source_paths, scripts_dir
@@ -57,9 +60,15 @@ def ensure_page(
     raise ScriptError(f"unsupported page type {page.type!r}")
 
 
-def _ensure_manual(path: Path, page: Page, meta: CodocFrontmatter) -> PageOutcome:
+def _ensure_manual(
+    path: Path,
+    page: Page,
+    meta: CodocFrontmatter,
+    *,
+    draft_body: str | None,
+) -> PageOutcome:
     if not path.is_file():
-        write_doc(path, meta, f"# {page.id}\n")
+        write_doc(path, meta, draft_body if draft_body else f"# {page.id}\n")
         return PageOutcome(page.id, Path(page.path), "created")
     text = path.read_text(encoding="utf-8")
     split = split_frontmatter(text)
@@ -74,6 +83,8 @@ def _ensure_hybrid(
     scope_dir: Path,
     meta: CodocFrontmatter,
     scripts_dir: str,
+    *,
+    draft_body: str | None,
 ) -> PageOutcome:
     existed = path.is_file()
     existing: dict | None = None
@@ -81,6 +92,8 @@ def _ensure_hybrid(
         split = split_frontmatter(path.read_text(encoding="utf-8"))
         body = split.body
         existing = split.mapping
+    elif draft_body:
+        body = draft_body.rstrip() + "\n" + _hybrid_stub(page)
     else:
         body = _hybrid_stub(page)
     body = _inject_placeholders(root, body, page, scope_dir, scripts_dir)
