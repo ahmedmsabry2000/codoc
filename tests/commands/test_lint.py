@@ -127,7 +127,55 @@ class LintCmdTests:
                 out, err, code = _run_in(repo, ["lint"])
         assert code is None
         assert out == "docs\n"
-        assert err == ""
+        # init docs may yield zero learned terms; stderr stays quiet then.
+        assert "vale failed" not in err
+
+    def test_lint_grows_learned_vocab_from_docs(self) -> None:
+        with _git_repo() as repo:
+            run_init(repo)
+            (repo / "docs" / "guide.md").write_text(
+                "Use FooBar with `parse_spec`.\nFooBar is required.\n",
+                encoding="utf-8",
+            )
+            completed = MagicMock(returncode=0)
+            with (
+                patch("codoc.commands.lint.shutil.which", return_value="/bin/vale"),
+                _patch_vale_run(completed),
+            ):
+                result = run_lint(repo)
+            learned = (repo / ".codoc" / "vocab" / "learned.txt").read_text(encoding="utf-8")
+            assert "FooBar" in learned
+            assert "parse_spec" in learned
+            accept = (
+                repo / ".codoc" / "generated" / "styles" / "Vocab" / "Codoc" / "accept.txt"
+            ).read_text(encoding="utf-8")
+            assert "FooBar" in accept
+            assert "parse_spec" in accept
+            assert result.learned_added
+            yaml_text = (repo / "codoc.yaml").read_text(encoding="utf-8")
+            assert "FooBar" not in yaml_text
+
+    def test_cli_lint_no_learn_skips_harvest(self) -> None:
+        with _git_repo() as repo:
+            run_init(repo)
+            (repo / "docs" / "guide.md").write_text(
+                "BrandNewTool BrandNewTool appears twice.\n",
+                encoding="utf-8",
+            )
+            completed = MagicMock(returncode=0)
+            with (
+                patch("codoc.commands.lint.shutil.which", return_value="/bin/vale"),
+                _patch_vale_run(completed),
+            ):
+                out, err, code = _run_in(repo, ["lint", "--no-learn"])
+            assert code is None
+            assert out == "docs\n"
+            assert "learned" not in err
+            assert not (repo / ".codoc" / "vocab" / "learned.txt").exists()
+            accept = (
+                repo / ".codoc" / "generated" / "styles" / "Vocab" / "Codoc" / "accept.txt"
+            ).read_text(encoding="utf-8")
+            assert "BrandNewTool" not in accept
 
     def test_cli_lint_disabled_message(self) -> None:
         with _git_repo() as repo:
