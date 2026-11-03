@@ -54,8 +54,11 @@ def retrieve(chunks: tuple[RagChunk, ...], query: str, *, limit: int = 5) -> tup
 
     scored: list[tuple[int, RagChunk]] = []
     for chunk in chunks:
-        hay = f"{chunk.heading}\n{chunk.text}".lower()
-        score = sum(1 for token in tokens if token in hay)
+        hay_tokens = {
+            token.lower()
+            for token in re.findall(r"[a-zA-Z0-9_]+", f"{chunk.heading}\n{chunk.text}")
+        }
+        score = sum(1 for token in tokens if token in hay_tokens)
         if score:
             scored.append((score, chunk))
     scored.sort(key=lambda item: (-item[0], item[1].path, item[1].heading))
@@ -80,6 +83,9 @@ def _chunk_page(page_id: str, rel: str, body: str) -> list[RagChunk]:
             return []
         return [RagChunk(page_id=page_id, path=rel, heading="", text=stripped[:2000])]
     chunks: list[RagChunk] = []
+    preamble = body[: matches[0].start()].strip()
+    if preamble:
+        chunks.append(RagChunk(page_id=page_id, path=rel, heading="", text=preamble[:2000]))
     for index, match in enumerate(matches):
         start = match.end()
         end = matches[index + 1].start() if index + 1 < len(matches) else len(body)

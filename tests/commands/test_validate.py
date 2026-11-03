@@ -60,6 +60,35 @@ class ValidateTests:
         assert not result.ok
         assert any(item.code == "link.broken" for item in result.findings)
 
+    def test_link_title_and_fenced_sample_ignored(self, git_repo: Path) -> None:
+        _seed(git_repo)
+        run_generate(git_repo)
+        guide = git_repo / "docs" / "guide.md"
+        guide.write_text(
+            "\n".join(
+                (
+                    "---",
+                    "codoc:",
+                    "  id: guide",
+                    "  type: manual",
+                    "---",
+                    "",
+                    "# Guide",
+                    "",
+                    '[api](api.md "API page")',
+                    "",
+                    "```md",
+                    "[also missing](not-a-file.md)",
+                    "```",
+                    "",
+                )
+            ),
+            encoding="utf-8",
+        )
+        result = run_validate(git_repo)
+        assert result.ok
+        assert not any(item.code == "link.broken" for item in result.findings)
+
     def test_frontmatter_mismatch_fails(self, git_repo: Path) -> None:
         _seed(git_repo)
         run_generate(git_repo)
@@ -98,4 +127,5 @@ class ValidateTests:
         run_generate(git_repo)
         write_text(git_repo / "src" / "demo" / "__init__.py", "VALUE = 2\n")
         result = run_validate(git_repo)
+        assert result.ok
         assert "src/demo/__init__.py" in result.candidates
