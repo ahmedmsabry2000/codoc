@@ -11,11 +11,11 @@ dirs = sorted(
     for path in base.iterdir()
     if path.is_dir() and not path.name.startswith("__") and path.name != "codoc.spec.yaml"
 )
-print("# Codoc package overview")
+print("# Codoc overview")
 print()
 print(f"Scope `{scope.as_posix()}`.")
 print()
-print("Top-level modules and packages:")
+print("Top-level modules:")
 print()
 for name in dirs:
     print(f"- `{name}/`")

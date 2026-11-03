@@ -18,7 +18,8 @@ _GENERATED_DIR = Path(".codoc") / "generated"
 # must sit at the git root — but it is not named mkdocs.yml and is not SoT.
 ENGINE_SHIM = Path(".codoc-engine.yml")
 _VALE_INI = _GENERATED_DIR / ".vale.ini"
-_VOCAB_DIR = _GENERATED_DIR / "styles" / "Vocab" / "Codoc"
+# Vale 3 looks under StylesPath/config/vocabularies/<Vocab>/.
+_VOCAB_DIR = _GENERATED_DIR / "styles" / "config" / "vocabularies" / "Codoc"
 _ACCEPT = _VOCAB_DIR / "accept.txt"
 _REJECT = _VOCAB_DIR / "reject.txt"
 
@@ -144,6 +145,8 @@ def _render_engine(config: ProjectConfig) -> str:
 
 
 def _render_vale_ini() -> str:
+    # Vocab accept lists feed Spelling. Terms capitalization is too noisy for
+    # mixed-case docs headings, so leave it off for the Mac pilot.
     return (
         f"{_HEADER}"
         "StylesPath = styles\n"
@@ -152,6 +155,7 @@ def _render_vale_ini() -> str:
         "\n"
         "[*.md]\n"
         "BasedOnStyles = Vale\n"
+        "Vale.Terms = NO\n"
     )
 
 

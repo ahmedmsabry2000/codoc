@@ -39,7 +39,14 @@ class CodegenTests:
         accept = (git_repo / result.vocab_accept).read_text(encoding="utf-8")
         assert accept == "Codoc\nZensical\n"
         assert (
-            git_repo / ".codoc" / "generated" / "styles" / "Vocab" / "Codoc" / "reject.txt"
+            git_repo
+            / ".codoc"
+            / "generated"
+            / "styles"
+            / "config"
+            / "vocabularies"
+            / "Codoc"
+            / "reject.txt"
         ).is_file()
 
     def test_vale_disabled_skips_vale_files(self, git_repo: Path) -> None:
