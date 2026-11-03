@@ -8,13 +8,14 @@ from pathlib import Path
 
 from codoc.config import ConfigError, LlmConfig, load_project_config
 from codoc.discover import DiscoverError, SpecUnit, discover, git_root
-from codoc.generate.frontmatter import split_frontmatter
+from codoc.generate.frontmatter import FrontmatterError, split_frontmatter
 from codoc.llm import LlmError, chat_completion, resolve_api_key
 from codoc.model.registry import PageRegistry, build_page_registry
 from codoc.model.spec import Page, SpecDocument, SpecError, load_spec
 from codoc.rag.index import build_rag_index, retrieve, write_rag_index
 
 _MD_LINK = re.compile(r"(?<!!)\[([^\]]*)\]\(([^)]+)\)")
+_FENCE_OPEN = re.compile(r"^(`{3,}|~{3,})")
 
 
 class ValidateError(Exception):
@@ -137,10 +138,8 @@ def _stage_d(
         )
     except LlmError as err:
         return _StageD((), (f"stage D skipped: {err}",))
-    return _StageD(
-        (Finding("info", "stage.d", answer.strip()[:500]),),
-        (),
-    )
+    message = re.sub(r"[\t\r\n]+", " ", answer.strip())[:500]
+    return _StageD((Finding("info", "stage.d", message),), ())
 
 
 def _check_page(
@@ -157,11 +156,19 @@ def _check_page(
         return findings
 
     text = abs_path.read_text(encoding="utf-8")
-    split = split_frontmatter(text)
-    if split.frontmatter is None:
+    try:
+        split = split_frontmatter(text)
+    except FrontmatterError as err:
+        findings.append(Finding("error", "frontmatter.invalid", str(err), page.path))
+        split = None
+
+    if split is None:
+        body = text
+    elif split.frontmatter is None:
         findings.append(
             Finding("error", "frontmatter.missing", "missing codoc frontmatter", page.path)
         )
+        body = split.body
     else:
         if split.frontmatter.id != page.id:
             findings.append(
@@ -181,6 +188,7 @@ def _check_page(
                     page.path,
                 )
             )
+        body = split.body
 
     if page.type == "auto-generated" and page.script and not (root / page.script).is_file():
         findings.append(
@@ -217,13 +225,14 @@ def _check_page(
             )
         )
 
-    for _label, target in _MD_LINK.findall(split.body if split.frontmatter else text):
-        if target.startswith(("http://", "https://", "mailto:", "#")):
+    for _label, target in _MD_LINK.findall(_without_fenced_code(body)):
+        href = _link_href(target)
+        if href is None:
             continue
-        href = target.split("#", 1)[0]
-        if not href:
+        path_part = href.split("#", 1)[0]
+        if not path_part:
             continue
-        resolved = (abs_path.parent / href).resolve()
+        resolved = (abs_path.parent / path_part).resolve()
         try:
             resolved.relative_to(root.resolve())
         except ValueError:
@@ -234,6 +243,38 @@ def _check_page(
         if not resolved.exists():
             findings.append(Finding("error", "link.broken", f"broken link: {target}", page.path))
     return findings
+
+
+def _without_fenced_code(text: str) -> str:
+    """Drop fenced code blocks so sample links inside them are not checked."""
+    lines = text.splitlines(keepends=True)
+    kept: list[str] = []
+    fence: str | None = None
+    for line in lines:
+        if fence is None:
+            match = _FENCE_OPEN.match(line.strip())
+            if match:
+                fence = match.group(1)[0] * len(match.group(1))
+                continue
+            kept.append(line)
+            continue
+        if line.strip().startswith(fence):
+            fence = None
+    return "".join(kept)
+
+
+def _link_href(target: str) -> str | None:
+    """Return the destination path/URL, stripping optional Markdown link titles."""
+    raw = target.strip()
+    if not raw:
+        return None
+    if raw.startswith("<") and ">" in raw:
+        raw = raw[1 : raw.index(">")].strip()
+    else:
+        raw = raw.split(None, 1)[0]
+    if raw.startswith(("http://", "https://", "mailto:", "#")):
+        return None
+    return raw
 
 
 def _coverage_files(root: Path, scope_dir: Path, doc: SpecDocument) -> set[str]:
