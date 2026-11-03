@@ -81,9 +81,7 @@ class EngulfTests:
         assert engine.docs_dir == "zdocs"
         assert engine.site_dir == "zsite"
 
-    def test_second_ensure_generated_is_quiet_when_already_imported(
-        self, git_repo: Path
-    ) -> None:
+    def test_second_ensure_generated_is_quiet_when_already_imported(self, git_repo: Path) -> None:
         (git_repo / "mkdocs.yml").write_text(
             "docs_dir: handbook\nsite_dir: public\n",
             encoding="utf-8",

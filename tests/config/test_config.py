@@ -110,9 +110,7 @@ class ConfigTests:
             ("paths:\n  scripts_dir: ~/scripts\n", "paths.scripts_dir"),
         ],
     )
-    def test_relative_path_rejects_parent_and_absolute(
-        self, text: str, field: str
-    ) -> None:
+    def test_relative_path_rejects_parent_and_absolute(self, text: str, field: str) -> None:
         with yaml_file(text) as path, pytest.raises(ConfigError) as caught:
             load_project_config(path)
         assert str(caught.value) == f"{path}: {field}: expected a relative path"

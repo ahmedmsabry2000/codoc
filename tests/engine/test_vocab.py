@@ -28,9 +28,7 @@ def _write_project(repo: Path, *, terms: list[str] | None = None) -> None:
 
 
 class VocabHarvestTests:
-    def test_harvest_finds_camel_snake_quoted_and_repeated_proper(
-        self, tmp_dir: Path
-    ) -> None:
+    def test_harvest_finds_camel_snake_quoted_and_repeated_proper(self, tmp_dir: Path) -> None:
         docs = tmp_dir / "docs"
         docs.mkdir()
         (docs / "guide.md").write_text(

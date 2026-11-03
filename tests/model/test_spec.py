@@ -1,4 +1,3 @@
-
 import pytest
 
 from codoc.model.spec import (
