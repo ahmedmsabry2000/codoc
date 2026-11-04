@@ -305,6 +305,75 @@ class GenerateTests:
         assert "From the model." in text
         assert not any("draft skipped" in note for note in result.notes)
 
+    def test_existing_page_with_llm_does_not_call_model(self, git_repo: Path, monkeypatch) -> None:
+        write_text(
+            git_repo / "codoc.yaml",
+            "\n".join(
+                (
+                    "engine:",
+                    "  name: zensical",
+                    "llm:",
+                    "  provider: openai",
+                    "  model: gpt-test",
+                    "  rewrite_stubs: true",
+                )
+            ),
+        )
+        write_text(
+            git_repo / "src" / "demo" / "codoc.spec.yaml",
+            "docs:\n  - id: guide\n    type: manual\n    path: docs/guide.md\n",
+        )
+        write_text(
+            git_repo / "docs" / "guide.md",
+            "---\ncodoc:\n  id: guide\n  type: manual\n---\n\n# Guide\n\nUser prose stays.\n",
+        )
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+        calls: list[object] = []
+
+        def fake_chat(**kwargs: object) -> str:
+            calls.append(kwargs)
+            return "# Nope\n"
+
+        monkeypatch.setattr("codoc.generate.draft.chat_completion", fake_chat)
+        result = run_generate(git_repo)
+        assert calls == []
+        assert any("existing page preserved" in note for note in result.notes)
+        text = (git_repo / "docs" / "guide.md").read_text(encoding="utf-8")
+        assert "User prose stays." in text
+        assert result.pages[0].action == "frontmatter"
+
+    def test_rewrite_stubs_rewrites_default_manual_stub(self, git_repo: Path, monkeypatch) -> None:
+        write_text(
+            git_repo / "codoc.yaml",
+            "\n".join(
+                (
+                    "engine:",
+                    "  name: zensical",
+                    "llm:",
+                    "  provider: openai",
+                    "  model: gpt-test",
+                    "  rewrite_stubs: true",
+                )
+            ),
+        )
+        write_text(
+            git_repo / "src" / "demo" / "codoc.spec.yaml",
+            "docs:\n  - id: guide\n    type: manual\n    path: docs/guide.md\n",
+        )
+        write_text(
+            git_repo / "docs" / "guide.md",
+            "---\ncodoc:\n  id: guide\n  type: manual\n---\n\n# guide\n",
+        )
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+        def fake_chat(**_kwargs: object) -> str:
+            return "# Guide\n\nRewritten stub.\n"
+
+        monkeypatch.setattr("codoc.generate.draft.chat_completion", fake_chat)
+        result = run_generate(git_repo)
+        assert result.pages[0].action == "rewritten"
+        assert "Rewritten stub." in (git_repo / "docs" / "guide.md").read_text(encoding="utf-8")
+
     def test_second_generate_reuses_warm_cache(self, git_repo: Path) -> None:
         script = _write_script(git_repo, "gen.py", 'print("# API")\nprint("body")\n')
         write_text(git_repo / "codoc.yaml", _project_yaml())

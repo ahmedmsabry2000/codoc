@@ -30,6 +30,9 @@ def fingerprint_inputs(
     doc: SpecDocument,
     source_paths: tuple[str, ...],
     scripts_dir: str,
+    llm_provider: str | None = None,
+    llm_model: str | None = None,
+    rewrite_stubs: bool = False,
 ) -> str:
     """
     Hash spec text, coverage source files, and scripts referenced by the pages.
@@ -46,6 +49,9 @@ def fingerprint_inputs(
         hasher.update(f"script:{script}\n".encode())
         _feed_file(hasher, root / script)
     hasher.update(f"scripts_dir:{scripts_dir}\n".encode())
+    hasher.update(
+        f"llm:{llm_provider or ''}:{llm_model or ''}:rewrite={int(rewrite_stubs)}\n".encode()
+    )
     return hasher.hexdigest()
 
 
