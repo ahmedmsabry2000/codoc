@@ -31,4 +31,5 @@ Put parse and inject scripts under `.codoc/scripts/`. Keep project settings in r
 
 ## See also
 
+- [CLI reference](../reference/cli.md)
 - [Package overview](../reference/package.md)

@@ -145,3 +145,5 @@ Top-level modules:
 ## See also
 
 - [Getting started](../guides/getting-started.md)
+
+- [CLI reference](cli.md)

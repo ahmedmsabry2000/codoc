@@ -6,7 +6,8 @@ This repository is the Codoc Python package. The installable command is `codoc`.
 
 | Rule | Covers |
 |------|--------|
-| [`.cursor/rules/codoc.mdc`](.cursor/rules/codoc.mdc) | Package layout, edit scope, vision-blind repo |
+| [`.cursor/rules/codoc.mdc`](.cursor/rules/codoc.mdc) | Package layout, edit scope, vision-blind, templates, non-invasive, git-first validate |
 | [`.cursor/rules/git-branches.mdc`](.cursor/rules/git-branches.mdc) | Branch naming and post-merge cleanup |
 | [`.cursor/rules/tests.mdc`](.cursor/rules/tests.mdc) | Pytest fixtures and test layout |
-| [`.cursor/rules/cli-behavior.mdc`](.cursor/rules/cli-behavior.mdc) | Current CLI command behavior |
+
+User-facing CLI how-to lives in [README.md](README.md) and [docs/reference/cli.md](docs/reference/cli.md), not in rules.
