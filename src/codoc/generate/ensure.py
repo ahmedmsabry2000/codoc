@@ -72,6 +72,9 @@ def _ensure_manual(
         return PageOutcome(page.id, Path(page.path), "created")
     text = path.read_text(encoding="utf-8")
     split = split_frontmatter(text)
+    if draft_body is not None:
+        write_doc(path, meta, draft_body, existing=split.mapping)
+        return PageOutcome(page.id, Path(page.path), "rewritten")
     write_doc(path, meta, split.body, existing=split.mapping)
     return PageOutcome(page.id, Path(page.path), "frontmatter")
 

@@ -2,6 +2,8 @@
 
 import json
 import os
+import shutil
+import subprocess
 import urllib.error
 import urllib.request
 from typing import Any
@@ -15,10 +17,17 @@ def resolve_api_key(provider: str) -> str | None:
     """Return an API key from the environment for the configured provider."""
     name = provider.lower()
     if name in {"openai", "openai-compatible"}:
-        return os.environ.get("OPENAI_API_KEY") or None
+        return os.environ.get("OPENAI_API_KEY") or os.environ.get("CODOC_LLM_API_KEY") or None
     if name == "anthropic":
-        return os.environ.get("ANTHROPIC_API_KEY") or None
+        return os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("CODOC_LLM_API_KEY") or None
+    if name == "cursor-cli":
+        return os.environ.get("CURSOR_API_KEY") or os.environ.get("CODOC_LLM_API_KEY") or None
     return None
+
+
+def cursor_agent_path() -> str | None:
+    """Return the path to the Cursor `agent` binary when present on PATH."""
+    return shutil.which("agent")
 
 
 def chat_completion(
@@ -32,7 +41,7 @@ def chat_completion(
     """
     Return the assistant text for a short chat request.
 
-    Supports openai, openai-compatible (OPENAI_BASE_URL), and anthropic.
+    Supports openai, openai-compatible (OPENAI_BASE_URL), anthropic, and cursor-cli.
     """
     name = provider.lower()
     if name in {"openai", "openai-compatible"}:
@@ -45,6 +54,13 @@ def chat_completion(
         )
     if name == "anthropic":
         return _anthropic_chat(
+            model=model,
+            api_key=api_key,
+            messages=messages,
+            timeout_s=timeout_s,
+        )
+    if name == "cursor-cli":
+        return _cursor_cli_chat(
             model=model,
             api_key=api_key,
             messages=messages,
@@ -135,6 +151,60 @@ def _anthropic_chat(
     if text == "":
         raise LlmError("anthropic response content empty")
     return text
+
+
+def _cursor_cli_chat(
+    *,
+    model: str,
+    api_key: str,
+    messages: list[dict[str, str]],
+    timeout_s: float,
+) -> str:
+    agent = cursor_agent_path()
+    if agent is None:
+        raise LlmError("cursor-cli: agent not found on PATH")
+    prompt = _flatten_messages(messages)
+    command = [
+        agent,
+        "-p",
+        "--output-format",
+        "text",
+        "--mode",
+        "ask",
+        "--api-key",
+        api_key,
+    ]
+    if model:
+        command.extend(["--model", model])
+    command.append(prompt)
+    try:
+        completed = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+        )
+    except subprocess.TimeoutExpired as err:
+        raise LlmError(f"cursor-cli timed out after {timeout_s}s") from err
+    except OSError as err:
+        raise LlmError(f"cursor-cli failed to start: {err}") from err
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout or "").strip()[:200]
+        raise LlmError(f"cursor-cli exit {completed.returncode}: {detail}")
+    text = completed.stdout.strip()
+    if not text:
+        raise LlmError("cursor-cli response empty")
+    return text
+
+
+def _flatten_messages(messages: list[dict[str, str]]) -> str:
+    parts: list[str] = []
+    for message in messages:
+        role = message.get("role", "user")
+        content = message.get("content", "")
+        parts.append(f"{role}:\n{content}")
+    return "\n\n".join(parts)
 
 
 def _post_json(

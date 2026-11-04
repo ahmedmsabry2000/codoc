@@ -10,10 +10,16 @@ from codoc.config import ConfigError, LlmConfig, load_project_config
 from codoc.coverage import expand_coverage_paths
 from codoc.discover import DiscoverError, SpecUnit, child_scopes, discover, git_root
 from codoc.generate.frontmatter import FrontmatterError, split_frontmatter
-from codoc.llm import LlmError, chat_completion, resolve_api_key
+from codoc.llm import (
+    LlmError,
+    chat_completion,
+    embed_texts,
+    resolve_api_key,
+    resolve_embedding_model,
+)
 from codoc.model.registry import PageRegistry, build_page_registry
 from codoc.model.spec import Page, SpecDocument, SpecError, load_spec
-from codoc.rag.index import build_rag_index, retrieve, write_rag_index
+from codoc.rag.index import attach_embeddings, build_rag_index, retrieve, write_rag_index
 
 _MD_LINK = re.compile(r"(?<!!)\[([^\]]*)\]\(([^)]+)\)")
 # CommonMark: fences may indent 0–3 spaces; closers are marker-only (no info string).
@@ -81,9 +87,11 @@ def run_validate(start: Path | None = None) -> ValidateResult:
 
     candidates = _git_candidates(root, coverage_files)
     rag_chunks = build_rag_index(page_files)
+    notes: list[str] = []
+    rag_chunks, embed_notes = _maybe_embed(config.llm, rag_chunks)
+    notes.extend(embed_notes)
     rag_path = write_rag_index(root, rag_chunks)
 
-    notes: list[str] = []
     if candidates:
         findings.append(
             Finding(
@@ -110,6 +118,27 @@ class _StageD:
     notes: tuple[str, ...]
 
 
+def _maybe_embed(llm: LlmConfig, chunks: tuple) -> tuple[tuple, tuple[str, ...]]:
+    if not chunks or not llm.provider:
+        return chunks, ()
+    model = resolve_embedding_model(llm.provider, llm.embedding_model)
+    if model is None:
+        return chunks, ()
+    api_key = resolve_api_key(llm.provider)
+    if not api_key:
+        return chunks, (f"rag embeddings skipped: no API key for {llm.provider}",)
+    try:
+        vectors = embed_texts(
+            [f"{chunk.heading}\n{chunk.text}" for chunk in chunks],
+            provider=llm.provider,
+            model=model,
+            api_key=api_key,
+        )
+    except LlmError as err:
+        return chunks, (f"rag embeddings skipped: {err}",)
+    return attach_embeddings(chunks, vectors), ("rag embeddings attached",)
+
+
 def _stage_d(
     llm: LlmConfig,
     candidates: tuple[str, ...] | list[str],
@@ -117,10 +146,28 @@ def _stage_d(
 ) -> _StageD:
     if not llm.provider or not llm.model:
         return _StageD((), ("stage D skipped: llm.provider/model not set",))
+    if llm.provider.lower() == "cursor-cli":
+        from codoc.llm import cursor_agent_path
+
+        if cursor_agent_path() is None:
+            return _StageD((), ("stage D skipped: agent not on PATH for cursor-cli",))
     api_key = resolve_api_key(llm.provider)
     if not api_key:
         return _StageD((), (f"stage D skipped: no API key for {llm.provider}",))
-    context = retrieve(chunks, " ".join(candidates), limit=5)
+    query = " ".join(candidates)
+    query_embedding = None
+    embed_model = resolve_embedding_model(llm.provider, llm.embedding_model)
+    if embed_model and any(getattr(chunk, "embedding", None) for chunk in chunks):
+        try:
+            query_embedding = embed_texts(
+                [query],
+                provider=llm.provider,
+                model=embed_model,
+                api_key=api_key,
+            )[0]
+        except LlmError:
+            query_embedding = None
+    context = retrieve(chunks, query, limit=5, query_embedding=query_embedding)
     context_text = (
         "\n\n".join(
             f"[{chunk.page_id} {chunk.path}#{chunk.heading}]\n{chunk.text[:400]}"

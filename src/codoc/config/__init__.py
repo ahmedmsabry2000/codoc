@@ -32,6 +32,8 @@ class ValeConfig:
 class LlmConfig:
     provider: str | None = None
     model: str | None = None
+    rewrite_stubs: bool = False
+    embedding_model: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -217,14 +219,28 @@ def _llm(data: dict, fail) -> LlmConfig:
     if "llm" not in data:
         return LlmConfig()
     raw = _mapping(data["llm"], "llm", fail)
-    _reject_unknown(raw, frozenset({"provider", "model"}), "llm", fail)
+    _reject_unknown(
+        raw,
+        frozenset({"provider", "model", "rewrite_stubs", "embedding_model"}),
+        "llm",
+        fail,
+    )
     provider = None
     model = None
+    rewrite_stubs = False
+    embedding_model = None
     if "provider" in raw:
         provider = _nonempty_str(raw["provider"], "llm.provider", fail)
     if "model" in raw:
         model = _nonempty_str(raw["model"], "llm.model", fail)
-    return LlmConfig(provider, model)
+    if "rewrite_stubs" in raw:
+        value = raw["rewrite_stubs"]
+        if not isinstance(value, bool):
+            raise fail("llm.rewrite_stubs: expected a boolean")
+        rewrite_stubs = value
+    if "embedding_model" in raw:
+        embedding_model = _nonempty_str(raw["embedding_model"], "llm.embedding_model", fail)
+    return LlmConfig(provider, model, rewrite_stubs, embedding_model)
 
 
 def _paths(data: dict, fail) -> PathsConfig:

@@ -5,6 +5,8 @@ import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from codoc.llm.embed import cosine_similarity
+
 _HEADING = re.compile(r"(?m)^(#{1,6})\s+(.+)$")
 
 
@@ -14,6 +16,7 @@ class RagChunk:
     path: str
     heading: str
     text: str
+    embedding: tuple[float, ...] | None = None
 
 
 def build_rag_index(pages: list[tuple[str, Path, str]]) -> tuple[RagChunk, ...]:
@@ -33,21 +36,63 @@ def build_rag_index(pages: list[tuple[str, Path, str]]) -> tuple[RagChunk, ...]:
     return tuple(chunks)
 
 
+def attach_embeddings(
+    chunks: tuple[RagChunk, ...],
+    vectors: list[list[float]],
+) -> tuple[RagChunk, ...]:
+    """Return chunks with embedding vectors attached (same order/length)."""
+    if len(vectors) != len(chunks):
+        raise ValueError("embedding count must match chunk count")
+    return tuple(
+        RagChunk(
+            page_id=chunk.page_id,
+            path=chunk.path,
+            heading=chunk.heading,
+            text=chunk.text,
+            embedding=tuple(vector),
+        )
+        for chunk, vector in zip(chunks, vectors, strict=True)
+    )
+
+
 def write_rag_index(root: Path, chunks: tuple[RagChunk, ...]) -> Path:
     """Write `.codoc/index/rag.json` and return its path."""
     out_dir = root / ".codoc" / "index"
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / "rag.json"
     payload = {
-        "version": 1,
+        "version": 2,
         "chunks": [asdict(chunk) for chunk in chunks],
     }
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path
 
 
-def retrieve(chunks: tuple[RagChunk, ...], query: str, *, limit: int = 5) -> tuple[RagChunk, ...]:
-    """Return chunks whose text/heading overlap query tokens (case-insensitive)."""
+def retrieve(
+    chunks: tuple[RagChunk, ...],
+    query: str,
+    *,
+    limit: int = 5,
+    query_embedding: list[float] | None = None,
+) -> tuple[RagChunk, ...]:
+    """
+    Return the best-matching chunks for query.
+
+    When query_embedding is set and chunks carry embeddings, rank by cosine
+    similarity. Otherwise fall back to case-insensitive token overlap.
+    """
+    if query_embedding is not None and any(chunk.embedding for chunk in chunks):
+        scored_emb: list[tuple[float, RagChunk]] = []
+        for chunk in chunks:
+            if not chunk.embedding:
+                continue
+            score = cosine_similarity(query_embedding, list(chunk.embedding))
+            if score > 0:
+                scored_emb.append((score, chunk))
+        scored_emb.sort(key=lambda item: (-item[0], item[1].path, item[1].heading))
+        if scored_emb:
+            return tuple(chunk for _score, chunk in scored_emb[:limit])
+
     tokens = {token.lower() for token in re.findall(r"[a-zA-Z0-9_]+", query) if len(token) > 2}
     if not tokens:
         return chunks[:limit]
