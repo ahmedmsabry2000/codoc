@@ -4,7 +4,17 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from codoc.config import ProjectConfig
+from codoc.commands.wizard import (
+    WizardDefaults,
+    WizardError,
+    apply_wizard_defaults,
+    confirm,
+    defaults_from_config,
+    is_interactive_tty,
+    run_wizard,
+    site_name_from_root,
+)
+from codoc.config import ConfigError, ProjectConfig, load_project_config
 from codoc.discover import DEFAULT_SKIP, DiscoverError, git_root
 from codoc.engine.engulf import (
     EngulfError,
@@ -79,8 +89,22 @@ class InitResult:
     notes: tuple[str, ...] = ()
 
 
-def run_init(start: Path | None = None, *, force: bool = False) -> InitResult:
-    """Scaffold Codoc files at the git root that contains start."""
+def run_init(
+    start: Path | None = None,
+    *,
+    force: bool = False,
+    yes: bool = False,
+    interactive: bool | None = None,
+    prompt=None,
+) -> InitResult:
+    """
+    Scaffold or update Codoc files at the git root that contains start.
+
+    Non-interactive (`yes=True` or no TTY): Zensical + Vale defaults, no LLM.
+    Interactive TTY: wizard for engine, Vale, terms, and optional LLM provider.
+    Existing projects: TTY offers config update/merge; `--force` overwrites
+    managed scaffold files; `--yes` alone does not clobber.
+    """
     if start is None:
         start = Path.cwd()
     try:
@@ -88,6 +112,7 @@ def run_init(start: Path | None = None, *, force: bool = False) -> InitResult:
     except DiscoverError as err:
         raise InitError(str(err)) from err
 
+    use_wizard = interactive if interactive is not None else (is_interactive_tty() and not yes)
     pkg = _choose_package_dir(root)
     spec_rel = pkg / _SPEC_FILE
     project = root / _PROJECT_FILE
@@ -95,14 +120,17 @@ def run_init(start: Path | None = None, *, force: bool = False) -> InitResult:
 
     _reject_path_shape_errors(root, pkg)
 
-    if not force:
+    existing = project.exists() or spec_abs.exists()
+    if existing and not force:
+        if use_wizard and project.is_file():
+            return _update_existing_config(root, project, spec_rel, prompt=prompt)
         conflicts: list[str] = []
         if project.exists():
             conflicts.append(_PROJECT_FILE)
         if spec_abs.exists():
             conflicts.append(spec_rel.as_posix())
-        if conflicts:
-            raise InitError("\n".join(f"{name} exists" for name in conflicts))
+        hint = " (pass --force to overwrite, or run interactively to update codoc.yaml)"
+        raise InitError("\n".join(f"{name} exists" for name in conflicts) + hint)
 
     notes: list[str] = []
     try:
@@ -112,9 +140,39 @@ def run_init(start: Path | None = None, *, force: bool = False) -> InitResult:
     if legacy_source is not None:
         notes.append(f"imported engine settings from {legacy_source.name} into codoc.yaml")
 
+    wizard_site = (
+        engine.site_name if engine.site_name != "Documentation" else site_name_from_root(root)
+    )
+    base = ProjectConfig(engine=engine)
+    if use_wizard:
+        try:
+            choices = run_wizard(
+                WizardDefaults(
+                    engine_name=engine.name,
+                    site_name=wizard_site,
+                    vale_enabled=True,
+                ),
+                prompt=prompt,
+            )
+        except WizardError as err:
+            raise InitError(str(err)) from err
+        config = apply_wizard_defaults(base, choices)
+        notes.append("configured via interactive wizard")
+    else:
+        config = apply_wizard_defaults(
+            base,
+            WizardDefaults(
+                engine_name=engine.name,
+                site_name=engine.site_name,
+                vale_enabled=True,
+            ),
+        )
+        if yes:
+            notes.append("used non-interactive defaults (--yes)")
+
     written: list[Path] = []
 
-    _atomic_write(project, render_project_yaml(ProjectConfig(engine=engine)))
+    _atomic_write(project, render_project_yaml(config))
     written.append(Path(_PROJECT_FILE))
 
     # pkg is repo-relative; always mkdir under root (not cwd).
@@ -153,6 +211,37 @@ def run_init(start: Path | None = None, *, force: bool = False) -> InitResult:
         spec_path=spec_rel,
         written=ordered,
         notes=tuple(notes),
+    )
+
+
+def _update_existing_config(
+    root: Path,
+    project: Path,
+    spec_rel: Path,
+    *,
+    prompt=None,
+) -> InitResult:
+    """Merge wizard answers into an existing codoc.yaml after confirmation."""
+    try:
+        if not confirm(
+            "codoc.yaml exists. Update project config",
+            default=False,
+            prompt=prompt,
+        ):
+            raise InitError("aborted (existing project unchanged)")
+        current = load_project_config(project)
+        choices = run_wizard(defaults_from_config(current), prompt=prompt)
+    except WizardError as err:
+        raise InitError(str(err)) from err
+    except ConfigError as err:
+        raise InitError(str(err)) from err
+    merged = apply_wizard_defaults(current, choices)
+    _atomic_write(project, render_project_yaml(merged))
+    return InitResult(
+        root=root,
+        spec_path=spec_rel if (root / spec_rel).is_file() else Path(_PROJECT_FILE),
+        written=(Path(_PROJECT_FILE),),
+        notes=("updated existing codoc.yaml via interactive wizard",),
     )
 
 

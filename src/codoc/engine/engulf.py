@@ -162,12 +162,21 @@ def render_project_yaml(config: ProjectConfig) -> str:
         "paths": {"scripts_dir": config.paths.scripts_dir},
         "terms": list(config.terms),
     }
-    if config.llm.provider is not None or config.llm.model is not None:
+    if (
+        config.llm.provider is not None
+        or config.llm.model is not None
+        or config.llm.rewrite_stubs
+        or config.llm.embedding_model is not None
+    ):
         llm: dict = {}
         if config.llm.provider is not None:
             llm["provider"] = config.llm.provider
         if config.llm.model is not None:
             llm["model"] = config.llm.model
+        if config.llm.rewrite_stubs:
+            llm["rewrite_stubs"] = True
+        if config.llm.embedding_model is not None:
+            llm["embedding_model"] = config.llm.embedding_model
         data["llm"] = llm
     if config.ignore_dirs:
         data["ignore"] = sorted(config.ignore_dirs)
