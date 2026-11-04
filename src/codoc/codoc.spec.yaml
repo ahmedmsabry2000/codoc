@@ -8,7 +8,7 @@ docs:
     path: docs/index.md
     purpose: >
       Landing page for the Codoc package docs—what the CLI does and where the
-      getting-started guide and package overview live.
+      getting-started guide, CLI reference, and package overview live.
   - id: guide
     type: hybrid
     path: docs/guides/getting-started.md
@@ -19,6 +19,19 @@ docs:
       - id: command-table
         script: .codoc/scripts/inject_commands.py
     links:
+      - id: cli
+        label: CLI reference
+      - id: package.overview
+        label: Package overview
+  - id: cli
+    type: manual
+    path: docs/reference/cli.md
+    purpose: >
+      Full user-facing CLI catalog: flags, outputs, exit codes, and command
+      behavior for init through clean.
+    links:
+      - id: guide
+        label: Getting started
       - id: package.overview
         label: Package overview
 coverage:
@@ -38,3 +51,5 @@ coverage:
           links:
             - id: guide
               label: Getting started
+            - id: cli
+              label: CLI reference

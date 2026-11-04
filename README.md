@@ -39,14 +39,14 @@ uv run codoc status
 uv run codoc clean
 ```
 
-`codoc drift` is an alias of `validate`.
+`codoc drift` is an alias of `validate`. Full flags, outputs, and exit codes: [CLI reference](docs/reference/cli.md).
 
 Typical loop in a target repo:
 
-1. `codoc init` writes `codoc.yaml`, a starter nested spec, `docs/`, and `.codoc/scripts/`. On a TTY it asks for engine (Zensical/MkDocs), Vale, seed terms, and optional BYO LLM (`openai` / `anthropic` / `openai-compatible` / `cursor-cli`). Use `--yes` to skip prompts. Re-run on an existing repo to update `codoc.yaml` interactively, or pass `--force` to overwrite scaffold files.
-2. Edit nested `codoc.spec.yaml` files: optional prose `intent` / `audience` (what the scope’s docs should accomplish and for whom) plus per-page `purpose`, alongside structured `manual` / `hybrid` / `auto-generated` pages and scripts under `.codoc/scripts/`.
-3. `codoc generate` writes docs by type (manual keeps body, hybrid injects placeholders, auto runs scripts) and feeds intent/audience/purpose into optional BYO draft prompts.
-4. `codoc validate` checks frontmatter, links, scripts, git-changed coverage files, and writes `.codoc/index/rag.json` (Stage D also sees scoped intent/purpose when an LLM is configured).
+1. `codoc init` writes `codoc.yaml`, a starter nested spec, `docs/`, and `.codoc/scripts/`. On a TTY it asks for engine (Zensical/MkDocs), Vale, seed terms, and optional BYO LLM. Use `--yes` to skip prompts, or `--force` to overwrite scaffold files.
+2. Edit nested `codoc.spec.yaml` files: optional prose `intent` / `audience` plus per-page `purpose`, alongside structured `manual` / `hybrid` / `auto-generated` pages and scripts under `.codoc/scripts/`.
+3. `codoc generate` writes docs by type; feeds intent/audience/purpose into optional BYO draft prompts.
+4. `codoc validate` checks structure and git-changed coverage, and writes `.codoc/index/rag.json`.
 5. `codoc build` / `codoc serve` refresh a transient `.codoc-engine.yml` from `codoc.yaml` and run Zensical.
 
 This repository dogfoods the same loop (`codoc.yaml` + `src/codoc/codoc.spec.yaml`).
