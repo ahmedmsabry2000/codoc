@@ -21,7 +21,11 @@ def resolve_api_key(provider: str) -> str | None:
     if name == "anthropic":
         return os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("CODOC_LLM_API_KEY") or None
     if name == "cursor-cli":
-        return os.environ.get("CURSOR_API_KEY") or os.environ.get("CODOC_LLM_API_KEY") or None
+        key = os.environ.get("CURSOR_API_KEY") or os.environ.get("CODOC_LLM_API_KEY")
+        if key:
+            return key
+        # agent login can work without exporting CURSOR_API_KEY
+        return "agent-login" if cursor_agent_path() is not None else None
     return None
 
 
@@ -171,12 +175,14 @@ def _cursor_cli_chat(
         "text",
         "--mode",
         "ask",
-        "--api-key",
-        api_key,
+        "--trust",
     ]
     if model:
         command.extend(["--model", model])
     command.append(prompt)
+    env = os.environ.copy()
+    if api_key and api_key != "agent-login":
+        env["CURSOR_API_KEY"] = api_key
     try:
         completed = subprocess.run(
             command,
@@ -184,6 +190,7 @@ def _cursor_cli_chat(
             capture_output=True,
             text=True,
             timeout=timeout_s,
+            env=env,
         )
     except subprocess.TimeoutExpired as err:
         raise LlmError(f"cursor-cli timed out after {timeout_s}s") from err

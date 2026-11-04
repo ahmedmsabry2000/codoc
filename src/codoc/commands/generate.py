@@ -12,13 +12,14 @@ from codoc.generate.fingerprint import (
     CachedPage,
     cache_is_warm,
     cache_path,
+    draft_skip_blocks_cache,
     fingerprint_inputs,
     read_cache,
     write_cache,
 )
 from codoc.generate.frontmatter import FrontmatterError
 from codoc.generate.scripts import ScriptError
-from codoc.model.registry import build_page_registry
+from codoc.model.registry import PageRegistry, build_page_registry
 from codoc.model.spec import CoverageBlock, Page, SpecDocument, SpecError, load_spec
 
 
@@ -37,6 +38,7 @@ def run_generate(
     start: Path | None = None,
     *,
     scope: str | None = None,
+    no_cache: bool = False,
 ) -> GenerateResult:
     """Discover every spec, merge the page registry, and ensure each page."""
     if start is None:
@@ -53,6 +55,7 @@ def run_generate(
         registry = build_page_registry(
             tuple((root / unit.spec_path, doc) for unit, doc in all_docs)
         )
+        registry_entries = _registry_entries(registry)
         excludes = child_scopes(all_units)
         outcomes: list[PageOutcome] = []
         notes: list[str] = []
@@ -73,13 +76,14 @@ def run_generate(
                 doc=doc,
                 source_paths=all_sources,
                 scripts_dir=config.paths.scripts_dir,
+                registry_entries=registry_entries,
                 llm_provider=config.llm.provider,
                 llm_model=config.llm.model,
                 rewrite_stubs=config.llm.rewrite_stubs,
             )
             entry_path = cache_path(root, unit.scope_dir)
-            cached = read_cache(entry_path)
-            if cache_is_warm(root, fingerprint=digest, cached=cached):
+            cached = None if no_cache else read_cache(entry_path)
+            if not no_cache and cache_is_warm(root, fingerprint=digest, cached=cached):
                 assert cached is not None
                 for page in cached[1]:
                     outcomes.append(
@@ -90,10 +94,13 @@ def run_generate(
                     notes.append(note)
                 continue
             unit_pages: list[PageOutcome] = []
+            unit_notes: list[str] = []
             for page in doc.pages():
                 draft, note = _maybe_draft(root, page, config.llm)
-                if note and note not in notes:
-                    notes.append(note)
+                if note:
+                    if note not in notes:
+                        notes.append(note)
+                    unit_notes.append(note)
                 outcome = ensure_page(
                     root=root,
                     page=page,
@@ -105,30 +112,62 @@ def run_generate(
                 )
                 unit_pages.append(outcome)
                 outcomes.append(outcome)
-            write_cache(
-                entry_path,
-                fingerprint=digest,
-                pages=tuple(
-                    CachedPage(page_id=item.page_id, path=item.path.as_posix(), action=item.action)
-                    for item in unit_pages
-                ),
-            )
+            if no_cache:
+                notes.append(f"cache bypassed for scope {unit.scope_dir.as_posix()}")
+            elif draft_skip_blocks_cache(unit_notes):
+                notes.append(
+                    f"cache not written for scope {unit.scope_dir.as_posix()} (draft skipped)"
+                )
+            else:
+                # Recompute digest after writes so page bodies match the warm entry.
+                digest = fingerprint_inputs(
+                    root,
+                    spec_path=unit.spec_path,
+                    doc=doc,
+                    source_paths=all_sources,
+                    scripts_dir=config.paths.scripts_dir,
+                    registry_entries=registry_entries,
+                    llm_provider=config.llm.provider,
+                    llm_model=config.llm.model,
+                    rewrite_stubs=config.llm.rewrite_stubs,
+                )
+                write_cache(
+                    entry_path,
+                    fingerprint=digest,
+                    pages=tuple(
+                        CachedPage(
+                            page_id=item.page_id,
+                            path=item.path.as_posix(),
+                            action=item.action,
+                        )
+                        for item in unit_pages
+                    ),
+                )
     except (DiscoverError, ConfigError, SpecError, ScriptError, FrontmatterError) as err:
         raise GenerateError(str(err)) from err
+    except ValueError as err:
+        raise GenerateError(str(err)) from err
     return GenerateResult(root=root, pages=tuple(outcomes), notes=tuple(notes))
+
+
+def _registry_entries(registry: PageRegistry) -> tuple[tuple[str, str], ...]:
+    return tuple((entry.id, entry.path) for entry in registry.entries)
 
 
 def _filter_units(units: tuple[SpecUnit, ...], scope: str | None) -> tuple[SpecUnit, ...]:
     if scope is None:
         return units
-    needle = Path(scope)
+    needle = Path(scope.rstrip("/"))
+    if needle == Path("."):
+        needle = Path(".")
     matched = [
         unit
         for unit in units
         if unit.scope_dir == needle
         or unit.spec_path == needle
-        or unit.spec_path.as_posix() == scope
-        or unit.scope_dir.as_posix() == scope
+        or unit.spec_path.as_posix() == scope.rstrip("/")
+        or unit.scope_dir.as_posix() == scope.rstrip("/")
+        or (needle == Path(".") and unit.scope_dir == Path("."))
     ]
     return tuple(matched)
 

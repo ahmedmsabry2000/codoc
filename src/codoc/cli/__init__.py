@@ -82,7 +82,10 @@ def main(argv: list[str] | None = None) -> None:
         _run_clean()
         return
     if behavior == "generate":
-        _run_generate(scope=getattr(args, "scope", None))
+        _run_generate(
+            scope=getattr(args, "scope", None),
+            no_cache=bool(getattr(args, "no_cache", False)),
+        )
         return
     if behavior == "validate":
         _run_validate()
@@ -116,6 +119,11 @@ def _build_parser() -> argparse.ArgumentParser:
                 "--scope",
                 metavar="DIR",
                 help="Regenerate only the spec whose scope_dir matches DIR.",
+            )
+            subparser.add_argument(
+                "--no-cache",
+                action="store_true",
+                help="Ignore and rewrite the warm generate cache under .codoc/cache/.",
             )
     return parser
 
@@ -184,9 +192,9 @@ def _run_clean() -> None:
         print(path.as_posix())
 
 
-def _run_generate(*, scope: str | None) -> None:
+def _run_generate(*, scope: str | None, no_cache: bool = False) -> None:
     try:
-        result = run_generate(Path.cwd(), scope=scope)
+        result = run_generate(Path.cwd(), scope=scope, no_cache=no_cache)
     except GenerateError as err:
         print(f"codoc generate: {err}", file=sys.stderr)
         raise SystemExit(1) from err
