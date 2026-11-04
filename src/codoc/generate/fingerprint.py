@@ -136,7 +136,7 @@ def _script_paths(doc: SpecDocument) -> tuple[str, ...]:
     return tuple(sorted(found))
 
 
-def _feed_file(hasher: hashlib._Hash, path: Path) -> None:
+def _feed_file(hasher: object, path: Path) -> None:
     hasher.update(f"file:{path.as_posix()}\n".encode())
     if not path.is_file():
         hasher.update(b"missing\n")
