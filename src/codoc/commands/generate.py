@@ -96,7 +96,7 @@ def run_generate(
             unit_pages: list[PageOutcome] = []
             unit_notes: list[str] = []
             for page in doc.pages():
-                draft, note = _maybe_draft(root, page, config.llm)
+                draft, note = _maybe_draft(root, page, config.llm, doc=doc)
                 if note:
                     if note not in notes:
                         notes.append(note)
@@ -176,13 +176,15 @@ def _maybe_draft(
     root: Path,
     page: Page,
     llm: LlmConfig,
+    *,
+    doc: SpecDocument,
 ) -> tuple[str | None, str | None]:
     """Draft new manual/hybrid stubs, or rewrite eligible manual stubs when configured."""
     if page.type not in {"manual", "hybrid"}:
         return None, None
     if (root / page.path).is_file():
-        return maybe_rewrite_stub(root, page, llm)
-    return draft_stub_body(page, llm)
+        return maybe_rewrite_stub(root, page, llm, doc=doc)
+    return draft_stub_body(page, llm, doc=doc)
 
 
 def _sources_by_page(

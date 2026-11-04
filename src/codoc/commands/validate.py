@@ -3,6 +3,7 @@
 import os
 import re
 import subprocess
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -20,6 +21,10 @@ from codoc.llm import (
 from codoc.model.registry import PageRegistry, build_page_registry
 from codoc.model.spec import Page, SpecDocument, SpecError, load_spec
 from codoc.rag.index import attach_embeddings, build_rag_index, retrieve, write_rag_index
+
+_STAGE_D_PURPOSE_LIMIT = 12
+_STAGE_D_PURPOSE_CHARS = 160
+_STAGE_D_INTENT_CHARS = 200
 
 _MD_LINK = re.compile(r"(?<!!)\[([^\]]*)\]\(([^)]+)\)")
 # CommonMark: fences may indent 0–3 spaces; closers are marker-only (no info string).
@@ -100,7 +105,7 @@ def run_validate(start: Path | None = None) -> ValidateResult:
                 f"{len(candidates)} coverage file(s) changed since HEAD",
             )
         )
-        stage_d = _stage_d(config.llm, candidates, rag_chunks)
+        stage_d = _stage_d(config.llm, candidates, rag_chunks, loaded)
         findings.extend(stage_d.findings)
         notes.extend(stage_d.notes)
 
@@ -143,6 +148,7 @@ def _stage_d(
     llm: LlmConfig,
     candidates: tuple[str, ...] | list[str],
     chunks: tuple,
+    loaded: Sequence[tuple[SpecUnit, SpecDocument]],
 ) -> _StageD:
     if not llm.provider or not llm.model:
         return _StageD((), ("stage D skipped: llm.provider/model not set",))
@@ -175,22 +181,39 @@ def _stage_d(
         )
         or "(no docs chunks)"
     )
-    prompt = (
-        "You review documentation drift for a Python repo.\n"
-        "Changed source files:\n"
-        + "\n".join(f"- {path}" for path in candidates)
-        + "\n\nRelated docs excerpts:\n"
-        + context_text
-        + "\n\nReply with one short paragraph: OK if docs look aligned, "
-        "or name the page ids that likely need regeneration."
+    intent_block = _stage_d_intent_block(candidates, loaded, context)
+    prompt_parts = [
+        "You review documentation drift for a Python repo.",
+        "Changed source files:",
+        "\n".join(f"- {path}" for path in candidates),
+        "",
+        "Related docs excerpts:",
+        context_text,
+    ]
+    if intent_block:
+        prompt_parts.extend(["", intent_block])
+    prompt_parts.extend(
+        [
+            "",
+            "Reply with one short paragraph: OK if docs look aligned, "
+            "or name the page ids that likely need regeneration.",
+        ]
     )
+    prompt = "\n".join(prompt_parts)
     try:
         answer = chat_completion(
             provider=llm.provider,
             model=llm.model,
             api_key=api_key,
             messages=[
-                {"role": "system", "content": "You are a concise docs drift reviewer."},
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a concise docs drift reviewer. "
+                        "Treat Scope intent, Audience, and Page purpose as guidance, "
+                        "not text to copy."
+                    ),
+                },
                 {"role": "user", "content": prompt},
             ],
             timeout_s=60.0 if llm.provider.lower() == "cursor-cli" else 30.0,
@@ -199,6 +222,76 @@ def _stage_d(
         return _StageD((), (f"stage D skipped: {err}",))
     message = re.sub(r"[\t\r\n]+", " ", answer.strip())[:500]
     return _StageD((Finding("info", "stage.d", message),), ())
+
+
+def _stage_d_intent_block(
+    candidates: Sequence[str],
+    loaded: Sequence[tuple[SpecUnit, SpecDocument]],
+    context: Sequence,
+) -> str:
+    """Scoped, capped intent/purpose inventory for Stage D prompts."""
+    owners = _owning_specs(candidates, loaded)
+    lines = ["Doc intents (guidance for which pages should cover the change, not excerpts):"]
+    for unit, doc in owners:
+        label = unit.scope_dir.as_posix()
+        if doc.intent:
+            lines.append(f"- Scope {label} intent: {_clip(doc.intent, _STAGE_D_INTENT_CHARS)}")
+        if doc.audience:
+            lines.append(f"- Scope {label} audience: {_clip(doc.audience, _STAGE_D_INTENT_CHARS)}")
+
+    pages_by_id = {page.id: page for _unit, doc in loaded for page in doc.pages()}
+    purpose_pages: list[Page] = []
+    seen: set[str] = set()
+    for chunk in context:
+        page = pages_by_id.get(getattr(chunk, "page_id", ""))
+        if page is None or not page.purpose or page.id in seen:
+            continue
+        purpose_pages.append(page)
+        seen.add(page.id)
+    for _unit, doc in owners:
+        for page in doc.pages():
+            if not page.purpose or page.id in seen:
+                continue
+            purpose_pages.append(page)
+            seen.add(page.id)
+
+    for page in purpose_pages[:_STAGE_D_PURPOSE_LIMIT]:
+        assert page.purpose is not None
+        lines.append(f"- Page {page.id} purpose: {_clip(page.purpose, _STAGE_D_PURPOSE_CHARS)}")
+    if len(lines) == 1:
+        return ""
+    return "\n".join(lines)
+
+
+def _owning_specs(
+    candidates: Sequence[str],
+    loaded: Sequence[tuple[SpecUnit, SpecDocument]],
+) -> list[tuple[SpecUnit, SpecDocument]]:
+    """Return unique specs that own at least one candidate (deepest scope wins)."""
+    ranked = sorted(
+        loaded,
+        key=lambda item: (len(item[0].scope_dir.parts), item[0].scope_dir.as_posix()),
+        reverse=True,
+    )
+    owned: dict[Path, tuple[SpecUnit, SpecDocument]] = {}
+    for candidate in candidates:
+        path = Path(candidate)
+        for unit, doc in ranked:
+            scope = unit.scope_dir
+            if scope != Path(".") and scope.parts != path.parts[: len(scope.parts)]:
+                continue
+            if scope == Path(".") and not path.parts:
+                continue
+            owned[scope] = (unit, doc)
+            break
+    return [owned[key] for key in sorted(owned, key=lambda item: item.as_posix())]
+
+
+def _clip(text: str, limit: int) -> str:
+    cleaned = " ".join(text.split())
+    if len(cleaned) <= limit:
+        return cleaned
+    return cleaned[: limit - 1].rstrip() + "…"
 
 
 def _check_page(

@@ -24,6 +24,10 @@ class InitTests:
             assert config.paths.scripts_dir == ".codoc/scripts"
             spec = load_spec(repo / result.spec_path)
             assert spec.page_count == 2
+            assert spec.intent is not None
+            assert "package" in spec.intent.lower()
+            assert spec.audience is not None
+            assert any(page.purpose for page in spec.pages())
             assert (repo / ".codoc" / "scripts" / ".gitkeep").is_file()
             assert not (repo / "codoc.spec.yaml").exists()
             ignore = (repo / ".gitignore").read_text(encoding="utf-8")

@@ -5,10 +5,15 @@ from pathlib import Path
 from codoc.config import LlmConfig
 from codoc.generate.frontmatter import FrontmatterError, split_frontmatter
 from codoc.llm import LlmError, chat_completion, resolve_api_key
-from codoc.model.spec import Page
+from codoc.model.spec import Page, SpecDocument
 
 
-def draft_stub_body(page: Page, llm: LlmConfig) -> tuple[str | None, str | None]:
+def draft_stub_body(
+    page: Page,
+    llm: LlmConfig,
+    *,
+    doc: SpecDocument | None = None,
+) -> tuple[str | None, str | None]:
     """
     Return (body, note) for a brand-new manual/hybrid page.
 
@@ -16,13 +21,15 @@ def draft_stub_body(page: Page, llm: LlmConfig) -> tuple[str | None, str | None]
     """
     if page.type not in {"manual", "hybrid"}:
         return None, None
-    return _request_draft(page, llm)
+    return _request_draft(page, llm, doc=doc)
 
 
 def maybe_rewrite_stub(
     root: Path,
     page: Page,
     llm: LlmConfig,
+    *,
+    doc: SpecDocument | None = None,
 ) -> tuple[str | None, str | None]:
     """
     Optionally rewrite an existing eligible manual stub when configured.
@@ -39,7 +46,7 @@ def maybe_rewrite_stub(
         return None, None
     if not is_eligible_manual_stub(abs_path, page):
         return None, "rewrite skipped: existing page preserved"
-    return _request_draft(page, llm)
+    return _request_draft(page, llm, doc=doc)
 
 
 def is_eligible_manual_stub(path: Path, page: Page) -> bool:
@@ -52,7 +59,12 @@ def is_eligible_manual_stub(path: Path, page: Page) -> bool:
     return body in {f"# {page.id}", ""}
 
 
-def _request_draft(page: Page, llm: LlmConfig) -> tuple[str | None, str | None]:
+def _request_draft(
+    page: Page,
+    llm: LlmConfig,
+    *,
+    doc: SpecDocument | None,
+) -> tuple[str | None, str | None]:
     if not llm.provider or not llm.model:
         return None, "draft skipped: llm.provider/model not set"
     if llm.provider.lower() == "cursor-cli":
@@ -63,11 +75,7 @@ def _request_draft(page: Page, llm: LlmConfig) -> tuple[str | None, str | None]:
     api_key = resolve_api_key(llm.provider)
     if not api_key:
         return None, f"draft skipped: no API key for {llm.provider}"
-    prompt = (
-        f"Write a short Markdown documentation stub for page id {page.id!r} "
-        f"(type {page.type}). Use a single H1 and two short paragraphs. "
-        "Do not include YAML frontmatter. Do not invent APIs."
-    )
+    prompt = _draft_prompt(page, doc)
     try:
         text = chat_completion(
             provider=llm.provider,
@@ -76,7 +84,11 @@ def _request_draft(page: Page, llm: LlmConfig) -> tuple[str | None, str | None]:
             messages=[
                 {
                     "role": "system",
-                    "content": "You draft concise technical documentation stubs.",
+                    "content": (
+                        "You draft concise technical documentation stubs. "
+                        "Treat Scope intent, Audience, and Page purpose as guidance, "
+                        "not text to copy verbatim."
+                    ),
                 },
                 {"role": "user", "content": prompt},
             ],
@@ -90,3 +102,18 @@ def _request_draft(page: Page, llm: LlmConfig) -> tuple[str | None, str | None]:
     if not cleaned.endswith("\n"):
         cleaned += "\n"
     return cleaned, None
+
+
+def _draft_prompt(page: Page, doc: SpecDocument | None) -> str:
+    lines = [
+        f"Write a short Markdown documentation stub for page id {page.id!r} (type {page.type}).",
+        "Use a single H1 and two short paragraphs.",
+        "Do not include YAML frontmatter. Do not invent APIs.",
+    ]
+    if doc is not None and doc.intent:
+        lines.append(f"Scope intent: {doc.intent}")
+    if doc is not None and doc.audience:
+        lines.append(f"Audience: {doc.audience}")
+    if page.purpose:
+        lines.append(f"Page purpose: {page.purpose}")
+    return "\n".join(lines)

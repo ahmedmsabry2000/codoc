@@ -134,7 +134,7 @@ def run_init(
 
     # pkg is repo-relative; always mkdir under root (not cwd).
     (root / pkg).mkdir(parents=True, exist_ok=True)
-    _atomic_write(spec_abs, load_template("codoc.spec.yaml"))
+    _atomic_write(spec_abs, load_template("starter-spec.yaml"))
     written.append(spec_rel)
 
     index = root / _INDEX_FILE

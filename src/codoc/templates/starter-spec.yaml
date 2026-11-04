@@ -1,0 +1,25 @@
+intent: >
+  Document this package so a developer can find the entry points, understand
+  what the public modules do, and know which docs to trust as the overview.
+audience: Developers working in this package subtree.
+docs:
+  - id: index
+    type: manual
+    path: docs/index.md
+    purpose: >
+      Orient a new reader: what this package is for, how to navigate the rest
+      of the docs, and where to start.
+coverage:
+  source:
+    - id: package
+      type: auto-generated
+      paths:
+        - "**/*.py"
+      docs:
+        - id: package.overview
+          path: docs/package.md
+          script: .codoc/scripts/gen_package_overview.py
+          canonical: index
+          purpose: >
+            Auto-generated module map of the package sources covered by this
+            spec, linked back to the manual index.
