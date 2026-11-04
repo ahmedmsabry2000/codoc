@@ -22,59 +22,16 @@ from codoc.engine.engulf import (
     render_project_yaml,
     seed_engine_from_legacy,
 )
+from codoc.templates import load_template
 
 _PROJECT_FILE = "codoc.yaml"
 _SPEC_FILE = "codoc.spec.yaml"
 _INDEX_FILE = Path("docs") / "index.md"
 _GITKEEP = Path(".codoc") / "scripts" / ".gitkeep"
 
-_SPEC_TEMPLATE = """\
-docs:
-  - id: index
-    type: manual
-    path: docs/index.md
-coverage:
-  source:
-    - id: package
-      type: auto-generated
-      paths:
-        - "**/*.py"
-      docs:
-        - id: package.overview
-          path: docs/package.md
-          script: .codoc/scripts/gen_package_overview.py
-          canonical: index
-"""
-
-_INDEX_TEMPLATE = "# Documentation site\n\nPackage overview\n"
-
-_PACKAGE_OVERVIEW_SCRIPT = '''\
-"""Emit a short auto-generated package overview page."""
-
-from pathlib import Path
-import os
-
-scope = Path(os.environ["CODOC_SCOPE_DIR"])
-root = Path(os.environ["CODOC_ROOT"])
-package = (root / scope).resolve()
-py_files = sorted(path.name for path in package.glob("*.py") if path.is_file())
-print(f"# {scope.name} overview")
-print()
-print(f"Package scope `{scope.as_posix()}`.")
-print()
-if py_files:
-    print("Python modules:")
-    print()
-    for name in py_files:
-        print(f"- `{name}`")
-else:
-    print("No top-level Python modules found under this scope.")
-'''
-
+# .gitignore lines that must appear as a contiguous Codoc block, then site shim lines.
 _CODOC_IGNORE_LINES = (".codoc/*", "!.codoc/scripts/", "!.codoc/scripts/**")
-# Engine shim is generated from codoc.yaml; not a second source of truth.
 _SITE_IGNORE_LINES = ("site/", ".codoc-engine.yml")
-_GITIGNORE_FRESH = "\n".join([*_CODOC_IGNORE_LINES, *_SITE_IGNORE_LINES]) + "\n"
 
 
 class InitError(Exception):
@@ -177,13 +134,13 @@ def run_init(
 
     # pkg is repo-relative; always mkdir under root (not cwd).
     (root / pkg).mkdir(parents=True, exist_ok=True)
-    _atomic_write(spec_abs, _SPEC_TEMPLATE)
+    _atomic_write(spec_abs, load_template("codoc.spec.yaml"))
     written.append(spec_rel)
 
     index = root / _INDEX_FILE
     index.parent.mkdir(parents=True, exist_ok=True)
     if force or not index.exists():
-        _atomic_write(index, _INDEX_TEMPLATE)
+        _atomic_write(index, load_template("docs-index.md"))
         written.append(_INDEX_FILE)
 
     gitkeep = root / _GITKEEP
@@ -195,7 +152,7 @@ def run_init(
     overview_script = Path(".codoc") / "scripts" / "gen_package_overview.py"
     overview_abs = root / overview_script
     if force or not overview_abs.exists():
-        _atomic_write(overview_abs, _PACKAGE_OVERVIEW_SCRIPT)
+        _atomic_write(overview_abs, load_template("gen_package_overview.py"))
         written.append(overview_script)
 
     gitignore = root / ".gitignore"
@@ -343,8 +300,9 @@ def _atomic_write(path: Path, text: str) -> None:
 
 
 def _ensure_gitignore(path: Path) -> bool:
+    fresh = load_template("gitignore")
     if not path.exists():
-        _atomic_write(path, _GITIGNORE_FRESH)
+        _atomic_write(path, fresh)
         return True
     if path.is_dir():
         raise InitError(".gitignore is a directory")
@@ -364,9 +322,6 @@ def _ensure_gitignore(path: Path) -> bool:
         return False
 
     text = "\n".join(new_lines) + "\n"
-    if original and not original.endswith("\n"):
-        # Append path already rebuilt full content with trailing newline.
-        pass
     _atomic_write(path, text)
     return True
 
