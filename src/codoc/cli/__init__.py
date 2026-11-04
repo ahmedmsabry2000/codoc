@@ -61,7 +61,10 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit(0)
     behavior = _BEHAVIOR_BY_TOKEN[args.command]
     if behavior == "init":
-        _run_init(force=bool(getattr(args, "force", False)))
+        _run_init(
+            force=bool(getattr(args, "force", False)),
+            yes=bool(getattr(args, "yes", False)),
+        )
         return
     if behavior == "status":
         _run_status()
@@ -108,6 +111,12 @@ def _build_parser() -> argparse.ArgumentParser:
                 action="store_true",
                 help="Overwrite codoc.yaml, the starter spec, and docs/index.md.",
             )
+            subparser.add_argument(
+                "--yes",
+                "-y",
+                action="store_true",
+                help="Non-interactive defaults (Zensical + Vale, no LLM). No prompts.",
+            )
         if command.name == "lint":
             subparser.add_argument(
                 "--no-learn",
@@ -128,9 +137,9 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _run_init(*, force: bool) -> None:
+def _run_init(*, force: bool, yes: bool = False) -> None:
     try:
-        result = run_init(Path.cwd(), force=force)
+        result = run_init(Path.cwd(), force=force, yes=yes)
     except InitError as err:
         for line in str(err).splitlines():
             print(f"codoc init: {line}", file=sys.stderr)

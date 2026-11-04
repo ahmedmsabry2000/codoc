@@ -27,7 +27,8 @@ uv run pytest
 ## Use
 
 ```bash
-uv run codoc init
+uv run codoc init          # interactive wizard on a TTY
+uv run codoc init --yes    # non-interactive defaults (CI)
 uv run codoc recommend
 uv run codoc generate
 uv run codoc validate
@@ -42,7 +43,7 @@ uv run codoc clean
 
 Typical loop in a target repo:
 
-1. `codoc init` writes `codoc.yaml`, a starter nested spec, `docs/`, and `.codoc/scripts/`.
+1. `codoc init` writes `codoc.yaml`, a starter nested spec, `docs/`, and `.codoc/scripts/`. On a TTY it asks for engine (Zensical/MkDocs), Vale, seed terms, and optional BYO LLM (`openai` / `anthropic` / `openai-compatible` / `cursor-cli`). Use `--yes` to skip prompts. Re-run on an existing repo to update `codoc.yaml` interactively, or pass `--force` to overwrite scaffold files.
 2. Edit specs (`manual` / `hybrid` / `auto-generated` pages) and scripts under `.codoc/scripts/`.
 3. `codoc generate` writes docs by type (manual keeps body, hybrid injects placeholders, auto runs scripts).
 4. `codoc validate` checks frontmatter, links, scripts, git-changed coverage files, and writes `.codoc/index/rag.json`.

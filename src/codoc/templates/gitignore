@@ -1,0 +1,5 @@
+.codoc/*
+!.codoc/scripts/
+!.codoc/scripts/**
+site/
+.codoc-engine.yml
