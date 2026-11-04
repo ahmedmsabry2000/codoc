@@ -193,6 +193,7 @@ def _stage_d(
                 {"role": "system", "content": "You are a concise docs drift reviewer."},
                 {"role": "user", "content": prompt},
             ],
+            timeout_s=60.0 if llm.provider.lower() == "cursor-cli" else 30.0,
         )
     except LlmError as err:
         return _StageD((), (f"stage D skipped: {err}",))

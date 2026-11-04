@@ -410,6 +410,150 @@ class GenerateTests:
         assert cache_dir.is_dir()
         assert any(cache_dir.iterdir())
 
+    def test_cache_invalidates_when_script_helper_changes(self, git_repo: Path) -> None:
+        write_text(git_repo / ".codoc" / "scripts" / "helper.txt", "v1\n")
+        script = _write_script(
+            git_repo,
+            "gen.py",
+            "from pathlib import Path\n"
+            "print('# API')\n"
+            "print(Path('.codoc/scripts/helper.txt').read_text().strip())\n",
+        )
+        write_text(git_repo / "codoc.yaml", _project_yaml())
+        write_text(git_repo / "src" / "demo" / "__init__.py", "X = 1\n")
+        write_text(
+            git_repo / "src" / "demo" / "codoc.spec.yaml",
+            "\n".join(
+                (
+                    "docs:",
+                    "  - id: guide",
+                    "    type: manual",
+                    "    path: docs/guide.md",
+                    "coverage:",
+                    "  source:",
+                    "    - id: api",
+                    "      type: auto-generated",
+                    "      paths:",
+                    '        - "*.py"',
+                    "      docs:",
+                    "        - id: api.ref",
+                    "          path: docs/api.md",
+                    f"          script: {script}",
+                )
+            ),
+        )
+        run_generate(git_repo)
+        assert "v1" in (git_repo / "docs" / "api.md").read_text(encoding="utf-8")
+        write_text(git_repo / ".codoc" / "scripts" / "helper.txt", "v2\n")
+        result = run_generate(git_repo)
+        assert any(page.action == "generated" for page in result.pages)
+        assert "v2" in (git_repo / "docs" / "api.md").read_text(encoding="utf-8")
+
+    def test_cache_invalidates_when_sibling_page_moves(self, git_repo: Path) -> None:
+        script = _write_script(git_repo, "gen.py", 'print("# API")\n')
+        write_text(git_repo / "codoc.yaml", _project_yaml())
+        write_text(git_repo / "src" / "a" / "__init__.py", "")
+        write_text(
+            git_repo / "src" / "a" / "codoc.spec.yaml",
+            "\n".join(
+                (
+                    "docs:",
+                    "  - id: guide",
+                    "    type: manual",
+                    "    path: docs/guide.md",
+                    "coverage:",
+                    "  source:",
+                    "    - id: api",
+                    "      type: auto-generated",
+                    "      paths:",
+                    '        - "*.py"',
+                    "      docs:",
+                    "        - id: api.ref",
+                    "          path: docs/api.md",
+                    f"          script: {script}",
+                    "          links:",
+                    "            - id: other",
+                    "              label: Other",
+                )
+            ),
+        )
+        write_text(
+            git_repo / "src" / "b" / "codoc.spec.yaml",
+            "docs:\n  - id: other\n    type: manual\n    path: docs/other.md\n",
+        )
+        run_generate(git_repo)
+        assert "](other.md)" in (git_repo / "docs" / "api.md").read_text(encoding="utf-8")
+        write_text(
+            git_repo / "src" / "b" / "codoc.spec.yaml",
+            "docs:\n  - id: other\n    type: manual\n    path: docs/moved/other.md\n",
+        )
+        (git_repo / "docs" / "other.md").unlink()
+        result = run_generate(git_repo)
+        assert any(
+            page.page_id == "api.ref" and page.action == "generated" for page in result.pages
+        )
+        assert "](moved/other.md)" in (git_repo / "docs" / "api.md").read_text(encoding="utf-8")
+
+    def test_hand_edit_auto_page_is_restored(self, git_repo: Path) -> None:
+        script = _write_script(git_repo, "gen.py", 'print("# API")\nprint("canonical")\n')
+        write_text(git_repo / "codoc.yaml", _project_yaml())
+        write_text(git_repo / "src" / "demo" / "__init__.py", "X = 1\n")
+        write_text(
+            git_repo / "src" / "demo" / "codoc.spec.yaml",
+            "\n".join(
+                (
+                    "docs:",
+                    "  - id: guide",
+                    "    type: manual",
+                    "    path: docs/guide.md",
+                    "coverage:",
+                    "  source:",
+                    "    - id: api",
+                    "      type: auto-generated",
+                    "      paths:",
+                    '        - "*.py"',
+                    "      docs:",
+                    "        - id: api.ref",
+                    "          path: docs/api.md",
+                    f"          script: {script}",
+                )
+            ),
+        )
+        run_generate(git_repo)
+        write_text(git_repo / "docs" / "api.md", "hand edit\n")
+        result = run_generate(git_repo)
+        assert any(
+            page.page_id == "api.ref" and page.action == "generated" for page in result.pages
+        )
+        assert "canonical" in (git_repo / "docs" / "api.md").read_text(encoding="utf-8")
+
+    def test_no_cache_flag_bypasses_warm_cache(self, git_repo: Path) -> None:
+        write_text(git_repo / "codoc.yaml", _project_yaml())
+        write_text(
+            git_repo / "src" / "demo" / "codoc.spec.yaml",
+            "docs:\n  - id: guide\n    type: manual\n    path: docs/guide.md\n",
+        )
+        run_generate(git_repo)
+        result = run_generate(git_repo, no_cache=True)
+        assert all(page.action != "cached" for page in result.pages)
+        assert any("cache bypassed" in note for note in result.notes)
+
+    def test_draft_skip_does_not_write_warm_cache(self, git_repo: Path, monkeypatch) -> None:
+        write_text(
+            git_repo / "codoc.yaml",
+            "engine:\n  name: zensical\nllm:\n  provider: openai\n  model: gpt-test\n",
+        )
+        write_text(
+            git_repo / "src" / "demo" / "codoc.spec.yaml",
+            "docs:\n  - id: guide\n    type: manual\n    path: docs/guide.md\n",
+        )
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        first = run_generate(git_repo)
+        assert any("draft skipped" in note for note in first.notes)
+        assert any("cache not written" in note for note in first.notes)
+        cache_dir = git_repo / ".codoc" / "cache" / "generate"
+        assert not cache_dir.exists() or not any(cache_dir.iterdir())
+
     def test_scoped_generate_only_touches_matching_spec(self, git_repo: Path) -> None:
         write_text(git_repo / "codoc.yaml", _project_yaml())
         write_text(

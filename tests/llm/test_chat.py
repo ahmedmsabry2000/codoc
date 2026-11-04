@@ -21,6 +21,13 @@ class LlmChatTests:
         with patch.dict("os.environ", {"CURSOR_API_KEY": "sk-c"}, clear=True):
             assert resolve_api_key("cursor-cli") == "sk-c"
 
+    def test_resolve_api_key_cursor_cli_falls_back_to_agent_login(self) -> None:
+        with (
+            patch.dict("os.environ", {}, clear=True),
+            patch("codoc.llm.chat.cursor_agent_path", return_value="/bin/agent"),
+        ):
+            assert resolve_api_key("cursor-cli") == "agent-login"
+
     def test_openai_chat_reads_content(self) -> None:
         payload = {"choices": [{"message": {"content": "hello"}}]}
         response = MagicMock()
@@ -57,6 +64,10 @@ class LlmChatTests:
         assert "-p" in command
         assert "--output-format" in command
         assert "text" in command
+        assert "--api-key" not in command
+        assert "--trust" in command
+        env = run.call_args.kwargs["env"]
+        assert env["CURSOR_API_KEY"] == "sk-c"
 
     def test_unsupported_provider(self) -> None:
         with pytest.raises(LlmError):
