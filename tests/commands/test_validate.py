@@ -43,7 +43,7 @@ class ValidateTests:
         assert result.rag_path is not None
         assert result.rag_path.is_file()
         payload = json.loads(result.rag_path.read_text(encoding="utf-8"))
-        assert payload["version"] == 1
+        assert payload["version"] == 2
         assert payload["chunks"]
         stdout, stderr, code = run_cli(git_repo, ["validate"])
         assert code is None

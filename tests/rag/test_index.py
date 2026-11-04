@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from codoc.rag.index import RagChunk, build_rag_index, retrieve, write_rag_index
+from codoc.rag.index import RagChunk, attach_embeddings, build_rag_index, retrieve, write_rag_index
 from tests.support.fs import write_text
 
 
@@ -49,3 +49,25 @@ class RagIndexTests:
         )
         hits = retrieve(chunks, "api")
         assert [chunk.page_id for chunk in hits] == ["api"]
+
+    def test_retrieve_prefers_embeddings_when_present(self) -> None:
+        chunks = attach_embeddings(
+            (
+                RagChunk(page_id="a", path="docs/a.md", heading="A", text="alpha"),
+                RagChunk(page_id="b", path="docs/b.md", heading="B", text="beta"),
+            ),
+            [[1.0, 0.0], [0.0, 1.0]],
+        )
+        hits = retrieve(chunks, "token that matches neither", query_embedding=[0.0, 1.0])
+        assert [chunk.page_id for chunk in hits] == ["b"]
+
+    def test_retrieve_falls_back_without_query_embedding(self) -> None:
+        chunks = attach_embeddings(
+            (
+                RagChunk(page_id="a", path="docs/a.md", heading="A", text="uniquealpha"),
+                RagChunk(page_id="b", path="docs/b.md", heading="B", text="beta"),
+            ),
+            [[1.0, 0.0], [0.0, 1.0]],
+        )
+        hits = retrieve(chunks, "uniquealpha")
+        assert hits[0].page_id == "a"

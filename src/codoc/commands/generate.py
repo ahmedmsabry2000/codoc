@@ -6,7 +6,7 @@ from pathlib import Path
 from codoc.config import ConfigError, LlmConfig, load_project_config
 from codoc.coverage import expand_coverage_paths
 from codoc.discover import DiscoverError, SpecUnit, child_scopes, discover, git_root
-from codoc.generate.draft import draft_stub_body
+from codoc.generate.draft import draft_stub_body, maybe_rewrite_stub
 from codoc.generate.ensure import PageOutcome, ensure_page
 from codoc.generate.fingerprint import (
     CachedPage,
@@ -73,6 +73,9 @@ def run_generate(
                 doc=doc,
                 source_paths=all_sources,
                 scripts_dir=config.paths.scripts_dir,
+                llm_provider=config.llm.provider,
+                llm_model=config.llm.model,
+                rewrite_stubs=config.llm.rewrite_stubs,
             )
             entry_path = cache_path(root, unit.scope_dir)
             cached = read_cache(entry_path)
@@ -135,11 +138,11 @@ def _maybe_draft(
     page: Page,
     llm: LlmConfig,
 ) -> tuple[str | None, str | None]:
-    """Draft only when creating a new manual/hybrid page."""
+    """Draft new manual/hybrid stubs, or rewrite eligible manual stubs when configured."""
     if page.type not in {"manual", "hybrid"}:
         return None, None
     if (root / page.path).is_file():
-        return None, None
+        return maybe_rewrite_stub(root, page, llm)
     return draft_stub_body(page, llm)
 
 

@@ -59,4 +59,16 @@ uv run codoc serve
 
 Sibling demo: [codoc-example](https://github.com/ahmedmsabry2000/codoc-example) (`../codoc-example` locally).
 
+## Optional BYO LLM
+
+Set `llm.provider` and `llm.model` in `codoc.yaml` for draft assist, optional stub rewrite (`llm.rewrite_stubs: true`), validate Stage D, and RAG embeddings. Keys stay in the environment only:
+
+| Provider | Env | Notes |
+| --- | --- | --- |
+| `openai` / `openai-compatible` | `OPENAI_API_KEY` (optional `OPENAI_BASE_URL`) | Chat + embeddings (`llm.embedding_model` or `text-embedding-3-small`) |
+| `anthropic` | `ANTHROPIC_API_KEY` | Chat only; RAG stays on token overlap |
+| `cursor-cli` | `CURSOR_API_KEY` | Requires `agent` on `PATH` (`agent -p`); Mac Cursor CLI install |
+
+Offline / no key: generate and validate still succeed with a stderr skip note. Warm `codoc generate` reuses `.codoc/cache/` when inputs are unchanged. Scope one spec with `codoc generate --scope src/pkg`.
+
 `uv run python -m codoc` calls the same entry point as `uv run codoc`.

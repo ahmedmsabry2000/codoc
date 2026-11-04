@@ -17,6 +17,10 @@ class LlmChatTests:
         with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-a"}, clear=True):
             assert resolve_api_key("anthropic") == "sk-a"
 
+    def test_resolve_api_key_cursor_cli(self) -> None:
+        with patch.dict("os.environ", {"CURSOR_API_KEY": "sk-c"}, clear=True):
+            assert resolve_api_key("cursor-cli") == "sk-c"
+
     def test_openai_chat_reads_content(self) -> None:
         payload = {"choices": [{"message": {"content": "hello"}}]}
         response = MagicMock()
@@ -31,6 +35,28 @@ class LlmChatTests:
                 messages=[{"role": "user", "content": "hi"}],
             )
         assert text == "hello"
+
+    def test_cursor_cli_runs_agent_print(self) -> None:
+        completed = MagicMock()
+        completed.returncode = 0
+        completed.stdout = "from agent\n"
+        completed.stderr = ""
+        with (
+            patch("codoc.llm.chat.cursor_agent_path", return_value="/bin/agent"),
+            patch("codoc.llm.chat.subprocess.run", return_value=completed) as run,
+        ):
+            text = chat_completion(
+                provider="cursor-cli",
+                model="composer-2",
+                api_key="sk-c",
+                messages=[{"role": "user", "content": "hi"}],
+            )
+        assert text == "from agent"
+        command = run.call_args.args[0]
+        assert command[0] == "/bin/agent"
+        assert "-p" in command
+        assert "--output-format" in command
+        assert "text" in command
 
     def test_unsupported_provider(self) -> None:
         with pytest.raises(LlmError):
