@@ -7,7 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from codoc.config import ConfigError, LlmConfig, load_project_config
-from codoc.discover import DiscoverError, SpecUnit, discover, git_root
+from codoc.coverage import expand_coverage_paths
+from codoc.discover import DiscoverError, SpecUnit, child_scopes, discover, git_root
 from codoc.generate.frontmatter import FrontmatterError, split_frontmatter
 from codoc.llm import LlmError, chat_completion, resolve_api_key
 from codoc.model.registry import PageRegistry, build_page_registry
@@ -62,9 +63,17 @@ def run_validate(start: Path | None = None) -> ValidateResult:
     findings: list[Finding] = []
     page_files: list[tuple[str, Path, str]] = []
     coverage_files: set[str] = set()
+    excludes = child_scopes(tuple(unit for unit, _doc in loaded))
 
     for unit, doc in loaded:
-        coverage_files.update(_coverage_files(root, unit.scope_dir, doc))
+        coverage_files.update(
+            _coverage_files(
+                root,
+                unit.scope_dir,
+                doc,
+                exclude_scopes=excludes.get(unit.scope_dir, ()),
+            )
+        )
         for page in doc.pages():
             abs_path = root / page.path
             page_files.append((page.id, abs_path, page.path))
@@ -301,19 +310,23 @@ def _link_href(target: str) -> str | None:
     return raw
 
 
-def _coverage_files(root: Path, scope_dir: Path, doc: SpecDocument) -> set[str]:
+def _coverage_files(
+    root: Path,
+    scope_dir: Path,
+    doc: SpecDocument,
+    *,
+    exclude_scopes: tuple[Path, ...] = (),
+) -> set[str]:
     found: set[str] = set()
-    base = root / scope_dir
     for block in doc.coverage.source + doc.coverage.features:
-        for pattern in block.paths:
-            if any(char in pattern for char in "*?["):
-                for match in base.glob(pattern):
-                    if match.is_file():
-                        found.add(match.relative_to(root).as_posix())
-            else:
-                candidate = base / pattern
-                if candidate.is_file():
-                    found.add(candidate.relative_to(root).as_posix())
+        found.update(
+            expand_coverage_paths(
+                root,
+                scope_dir,
+                block.paths,
+                exclude_scopes=exclude_scopes,
+            )
+        )
     return found
 
 

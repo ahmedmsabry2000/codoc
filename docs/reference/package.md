@@ -16,6 +16,7 @@ codoc:
   - path: src/codoc/commands/status.py
   - path: src/codoc/commands/validate.py
   - path: src/codoc/config/__init__.py
+  - path: src/codoc/coverage.py
   - path: src/codoc/discover/__init__.py
   - path: src/codoc/engine/__init__.py
   - path: src/codoc/engine/codegen.py
@@ -24,6 +25,7 @@ codoc:
   - path: src/codoc/generate/__init__.py
   - path: src/codoc/generate/draft.py
   - path: src/codoc/generate/ensure.py
+  - path: src/codoc/generate/fingerprint.py
   - path: src/codoc/generate/frontmatter.py
   - path: src/codoc/generate/links.py
   - path: src/codoc/generate/scripts.py
@@ -53,6 +55,7 @@ Top-level modules:
 - `rag/`
 - `__init__.py`
 - `__main__.py`
+- `coverage.py`
 
 ## Sources
 
@@ -82,6 +85,8 @@ Top-level modules:
 
 - [`__init__.py`](../../src/codoc/config/__init__.py)
 
+- [`coverage.py`](../../src/codoc/coverage.py)
+
 - [`__init__.py`](../../src/codoc/discover/__init__.py)
 
 - [`__init__.py`](../../src/codoc/engine/__init__.py)
@@ -97,6 +102,8 @@ Top-level modules:
 - [`draft.py`](../../src/codoc/generate/draft.py)
 
 - [`ensure.py`](../../src/codoc/generate/ensure.py)
+
+- [`fingerprint.py`](../../src/codoc/generate/fingerprint.py)
 
 - [`frontmatter.py`](../../src/codoc/generate/frontmatter.py)
 
