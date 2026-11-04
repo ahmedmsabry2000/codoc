@@ -324,3 +324,59 @@ class ValidateTests:
         assert "\t" not in stage.message
         assert "\n" not in stage.message
         assert stage.message == "looks ok but has tabs"
+
+    def test_stage_d_prompt_includes_scoped_intent(self, git_repo: Path, monkeypatch) -> None:
+        write_text(
+            git_repo / "codoc.yaml",
+            "\n".join(
+                (
+                    "engine:",
+                    "  name: zensical",
+                    "llm:",
+                    "  provider: openai",
+                    "  model: gpt-test",
+                )
+            ),
+        )
+        write_text(git_repo / "src" / "demo" / "__init__.py", "VALUE = 1\n")
+        write_text(
+            git_repo / "src" / "demo" / "codoc.spec.yaml",
+            "\n".join(
+                (
+                    "intent: Document the demo package for contributors.",
+                    "audience: Package maintainers",
+                    "docs:",
+                    "  - id: index",
+                    "    type: manual",
+                    "    path: docs/index.md",
+                    "    purpose: Orient readers to the demo package.",
+                    "coverage:",
+                    "  source:",
+                    "    - id: pkg",
+                    "      type: auto-generated",
+                    "      paths:",
+                    '        - "*.py"',
+                    "      docs:",
+                    "        - id: pkg.overview",
+                    "          path: docs/package.md",
+                    "          purpose: Map demo package modules.",
+                )
+            ),
+        )
+        run_generate(git_repo)
+        write_text(git_repo / "src" / "demo" / "__init__.py", "VALUE = 2\n")
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+        captured: dict[str, object] = {}
+
+        def fake_chat(**kwargs: object) -> str:
+            captured["messages"] = kwargs["messages"]
+            return "OK"
+
+        monkeypatch.setattr("codoc.commands.validate.chat_completion", fake_chat)
+        result = run_validate(git_repo)
+        assert result.ok
+        user = captured["messages"][1]["content"]  # type: ignore[index]
+        assert "Scope src/demo intent: Document the demo package for contributors." in user
+        assert "Scope src/demo audience: Package maintainers" in user
+        assert "Page index purpose: Orient readers to the demo package." in user
+        assert "Page pkg.overview purpose: Map demo package modules." in user

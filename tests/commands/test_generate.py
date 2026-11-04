@@ -291,11 +291,24 @@ class GenerateTests:
         )
         write_text(
             git_repo / "src" / "demo" / "codoc.spec.yaml",
-            "docs:\n  - id: guide\n    type: manual\n    path: docs/guide.md\n",
+            "\n".join(
+                (
+                    "intent: Explain the demo package.",
+                    "audience: Demo maintainers",
+                    "docs:",
+                    "  - id: guide",
+                    "    type: manual",
+                    "    path: docs/guide.md",
+                    "    purpose: Teach the local loop.",
+                    "",
+                )
+            ),
         )
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+        captured: dict[str, object] = {}
 
-        def fake_chat(**_kwargs: object) -> str:
+        def fake_chat(**kwargs: object) -> str:
+            captured["messages"] = kwargs["messages"]
             return "# Drafted\n\nFrom the model.\n"
 
         monkeypatch.setattr("codoc.generate.draft.chat_completion", fake_chat)
@@ -304,6 +317,60 @@ class GenerateTests:
         text = (git_repo / "docs" / "guide.md").read_text(encoding="utf-8")
         assert "From the model." in text
         assert not any("draft skipped" in note for note in result.notes)
+        user = captured["messages"][1]["content"]  # type: ignore[index]
+        assert "Scope intent: Explain the demo package." in user
+        assert "Audience: Demo maintainers" in user
+        assert "Page purpose: Teach the local loop." in user
+
+    def test_purpose_change_redrafts_eligible_stub(self, git_repo: Path, monkeypatch) -> None:
+        write_text(git_repo / "codoc.yaml", "engine:\n  name: zensical\n")
+        write_text(
+            git_repo / "src" / "demo" / "codoc.spec.yaml",
+            "docs:\n  - id: guide\n    type: manual\n    path: docs/guide.md\n",
+        )
+        run_generate(git_repo)
+        stub = (git_repo / "docs" / "guide.md").read_text(encoding="utf-8")
+        assert "# guide" in stub
+        write_text(
+            git_repo / "codoc.yaml",
+            "\n".join(
+                (
+                    "engine:",
+                    "  name: zensical",
+                    "llm:",
+                    "  provider: openai",
+                    "  model: gpt-test",
+                    "  rewrite_stubs: true",
+                )
+            ),
+        )
+        write_text(
+            git_repo / "src" / "demo" / "codoc.spec.yaml",
+            "\n".join(
+                (
+                    "docs:",
+                    "  - id: guide",
+                    "    type: manual",
+                    "    path: docs/guide.md",
+                    "    purpose: Cover the install path.",
+                    "",
+                )
+            ),
+        )
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+        captured: dict[str, object] = {}
+
+        def fake_chat(**kwargs: object) -> str:
+            captured["messages"] = kwargs["messages"]
+            return "# Second\n\nRewritten for purpose.\n"
+
+        monkeypatch.setattr("codoc.generate.draft.chat_completion", fake_chat)
+        result = run_generate(git_repo)
+        assert result.pages[0].action == "rewritten"
+        user = captured["messages"][1]["content"]  # type: ignore[index]
+        assert "Page purpose: Cover the install path." in user
+        text = (git_repo / "docs" / "guide.md").read_text(encoding="utf-8")
+        assert "Rewritten for purpose." in text
 
     def test_existing_page_with_llm_does_not_call_model(self, git_repo: Path, monkeypatch) -> None:
         write_text(

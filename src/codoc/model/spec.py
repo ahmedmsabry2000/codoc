@@ -35,6 +35,7 @@ class Page:
     links: tuple[Link, ...] = ()
     placeholders: tuple[Placeholder, ...] = ()
     script: str | None = None
+    purpose: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +56,8 @@ class Coverage:
 class SpecDocument:
     docs: tuple[Page, ...] = ()
     coverage: Coverage = Coverage()
+    intent: str | None = None
+    audience: str | None = None
 
     def pages(self) -> tuple[Page, ...]:
         blocks = self.coverage.source + self.coverage.features
@@ -125,10 +128,12 @@ def _read_mapping(path: Path, fail: Callable[[str], Exception]) -> dict:
     return loaded
 
 
-_ROOT_KEYS = frozenset({"docs", "coverage"})
+_ROOT_KEYS = frozenset({"docs", "coverage", "intent", "audience"})
 _COVERAGE_KEYS = frozenset({"source", "features"})
 _BLOCK_KEYS = frozenset({"id", "type", "paths", "docs"})
-_PAGE_KEYS = frozenset({"id", "type", "path", "canonical", "links", "placeholders", "script"})
+_PAGE_KEYS = frozenset(
+    {"id", "type", "path", "canonical", "links", "placeholders", "script", "purpose"}
+)
 _LINK_KEYS = frozenset({"id", "label"})
 _PLACEHOLDER_KEYS = frozenset({"id", "script"})
 _TYPE_NAMES = ", ".join(PAGE_TYPES[:-1]) + f", or {PAGE_TYPES[-1]}"
@@ -148,6 +153,8 @@ def load_spec(path: Path) -> SpecDocument:
     return SpecDocument(
         docs=tuple(page for page, _where in top),
         coverage=coverage,
+        intent=_optional_prose(data, "intent", "intent", fail),
+        audience=_optional_prose(data, "audience", "audience", fail),
     )
 
 
@@ -174,6 +181,18 @@ def _label(value: object, where: str, fail) -> str:
     if not isinstance(value, str) or value == "":
         raise fail(f"{where}: expected a non-empty string")
     return value
+
+
+def _prose(value: object, where: str, fail) -> str:
+    if not isinstance(value, str) or value.strip() == "":
+        raise fail(f"{where}: expected a non-empty string")
+    return value.strip()
+
+
+def _optional_prose(owner: dict, key: str, where: str, fail) -> str | None:
+    if key not in owner:
+        return None
+    return _prose(owner[key], where, fail)
 
 
 def _relative_path(value: object, where: str, fail) -> str:
@@ -235,6 +254,7 @@ def _parse_page(item: object, where: str, fail, block_type: str | None) -> tuple
         links=_links(item, where, fail),
         placeholders=_placeholders(item, where, fail, page_type),
         script=_script(item, where, fail, page_type),
+        purpose=_optional_prose(item, "purpose", f"{where}.purpose", fail),
     )
     return page, where
 

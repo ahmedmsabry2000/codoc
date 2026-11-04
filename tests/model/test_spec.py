@@ -345,3 +345,53 @@ class SpecTests:
         with yaml_file(text) as path, pytest.raises(SpecError) as caught:
             load_spec(path)
         assert str(caught.value) == f"{path}: docs[0].path: expected a relative path"
+
+    def test_optional_prose_fields(self) -> None:
+        text = "\n".join(
+            (
+                "intent: |",
+                "  Help contributors ship docs for this package.",
+                "audience: Library maintainers",
+                "docs:",
+                "  - id: overview",
+                "    type: manual",
+                "    path: docs/overview.md",
+                "    purpose: Orient a new reader.",
+                "",
+            )
+        )
+        with yaml_file(text) as path:
+            loaded = load_spec(path)
+        assert loaded.intent == "Help contributors ship docs for this package."
+        assert loaded.audience == "Library maintainers"
+        assert loaded.docs[0].purpose == "Orient a new reader."
+
+    def test_blank_prose_is_rejected(self) -> None:
+        text = "\n".join(
+            (
+                "intent: '   '",
+                "docs:",
+                "  - id: overview",
+                "    type: manual",
+                "    path: docs/overview.md",
+                "",
+            )
+        )
+        with yaml_file(text) as path, pytest.raises(SpecError) as caught:
+            load_spec(path)
+        assert str(caught.value) == f"{path}: intent: expected a non-empty string"
+
+    def test_blank_page_purpose_is_rejected(self) -> None:
+        text = "\n".join(
+            (
+                "docs:",
+                "  - id: overview",
+                "    type: manual",
+                "    path: docs/overview.md",
+                "    purpose: ''",
+                "",
+            )
+        )
+        with yaml_file(text) as path, pytest.raises(SpecError) as caught:
+            load_spec(path)
+        assert str(caught.value) == f"{path}: docs[0].purpose: expected a non-empty string"

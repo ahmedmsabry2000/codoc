@@ -1,10 +1,20 @@
+intent: >
+  Keep Codoc's own package docs honest: explain the CLI surface for contributors
+  and keep an auto-generated package map aligned with the source tree.
+audience: Contributors hacking on the Codoc CLI and nearby tooling.
 docs:
   - id: index
     type: manual
     path: docs/index.md
+    purpose: >
+      Landing page for the Codoc package docs—what the CLI does and where the
+      getting-started guide and package overview live.
   - id: guide
     type: hybrid
     path: docs/guides/getting-started.md
+    purpose: >
+      Walk a contributor through the local develop loop, with an injected
+      command table that stays in sync with the CLI.
     placeholders:
       - id: command-table
         script: .codoc/scripts/inject_commands.py
@@ -22,6 +32,9 @@ coverage:
           path: docs/reference/package.md
           script: .codoc/scripts/gen_package_overview.py
           canonical: guide
+          purpose: >
+            Generated reference of Codoc package modules under this scope,
+            pointing readers back to the getting-started guide.
           links:
             - id: guide
               label: Getting started

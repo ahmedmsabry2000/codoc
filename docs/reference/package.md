@@ -15,6 +15,7 @@ codoc:
   - path: src/codoc/commands/site.py
   - path: src/codoc/commands/status.py
   - path: src/codoc/commands/validate.py
+  - path: src/codoc/commands/wizard.py
   - path: src/codoc/config/__init__.py
   - path: src/codoc/coverage.py
   - path: src/codoc/discover/__init__.py
@@ -31,11 +32,14 @@ codoc:
   - path: src/codoc/generate/scripts.py
   - path: src/codoc/llm/__init__.py
   - path: src/codoc/llm/chat.py
+  - path: src/codoc/llm/embed.py
   - path: src/codoc/model/__init__.py
   - path: src/codoc/model/registry.py
   - path: src/codoc/model/spec.py
   - path: src/codoc/rag/__init__.py
   - path: src/codoc/rag/index.py
+  - path: src/codoc/templates/__init__.py
+  - path: src/codoc/templates/gen_package_overview.py
 ---
 
 # Codoc overview
@@ -53,6 +57,7 @@ Top-level modules:
 - `llm/`
 - `model/`
 - `rag/`
+- `templates/`
 - `__init__.py`
 - `__main__.py`
 - `coverage.py`
@@ -82,6 +87,8 @@ Top-level modules:
 - [`status.py`](../../src/codoc/commands/status.py)
 
 - [`validate.py`](../../src/codoc/commands/validate.py)
+
+- [`wizard.py`](../../src/codoc/commands/wizard.py)
 
 - [`__init__.py`](../../src/codoc/config/__init__.py)
 
@@ -115,6 +122,8 @@ Top-level modules:
 
 - [`chat.py`](../../src/codoc/llm/chat.py)
 
+- [`embed.py`](../../src/codoc/llm/embed.py)
+
 - [`__init__.py`](../../src/codoc/model/__init__.py)
 
 - [`registry.py`](../../src/codoc/model/registry.py)
@@ -124,6 +133,10 @@ Top-level modules:
 - [`__init__.py`](../../src/codoc/rag/__init__.py)
 
 - [`index.py`](../../src/codoc/rag/index.py)
+
+- [`__init__.py`](../../src/codoc/templates/__init__.py)
+
+- [`gen_package_overview.py`](../../src/codoc/templates/gen_package_overview.py)
 
 ## Original page
 
