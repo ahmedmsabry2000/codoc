@@ -82,7 +82,7 @@ def main(argv: list[str] | None = None) -> None:
         _run_clean()
         return
     if behavior == "generate":
-        _run_generate()
+        _run_generate(scope=getattr(args, "scope", None))
         return
     if behavior == "validate":
         _run_validate()
@@ -110,6 +110,12 @@ def _build_parser() -> argparse.ArgumentParser:
                 "--no-learn",
                 action="store_true",
                 help="Do not harvest new terms from docs into .codoc/vocab/learned.txt.",
+            )
+        if command.name == "generate":
+            subparser.add_argument(
+                "--scope",
+                metavar="DIR",
+                help="Regenerate only the spec whose scope_dir matches DIR.",
             )
     return parser
 
@@ -178,9 +184,9 @@ def _run_clean() -> None:
         print(path.as_posix())
 
 
-def _run_generate() -> None:
+def _run_generate(*, scope: str | None) -> None:
     try:
-        result = run_generate(Path.cwd())
+        result = run_generate(Path.cwd(), scope=scope)
     except GenerateError as err:
         print(f"codoc generate: {err}", file=sys.stderr)
         raise SystemExit(1) from err

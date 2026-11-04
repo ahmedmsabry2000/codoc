@@ -229,6 +229,53 @@ class ValidateTests:
         assert result.ok
         assert "src/demo/__init__.py" in result.candidates
 
+    def test_nested_specs_validate_with_excluded_parent_coverage(self, git_repo: Path) -> None:
+        from codoc.commands import validate as validate_mod
+        from codoc.discover import child_scopes, discover
+        from codoc.model.spec import load_spec
+
+        write_text(git_repo / "codoc.yaml", "engine:\n  name: zensical\n")
+        write_text(git_repo / "src" / "pkg" / "__init__.py", "P = 1\n")
+        write_text(git_repo / "src" / "pkg" / "child" / "__init__.py", "C = 1\n")
+        write_text(
+            git_repo / "src" / "pkg" / "codoc.spec.yaml",
+            "\n".join(
+                (
+                    "docs:",
+                    "  - id: parent",
+                    "    type: manual",
+                    "    path: docs/parent.md",
+                    "coverage:",
+                    "  source:",
+                    "    - id: pkg",
+                    "      type: auto-generated",
+                    "      paths:",
+                    '        - "**/*.py"',
+                    "      docs:",
+                    "        - id: parent.ref",
+                    "          path: docs/parent-ref.md",
+                )
+            ),
+        )
+        write_text(
+            git_repo / "src" / "pkg" / "child" / "codoc.spec.yaml",
+            "docs:\n  - id: child\n    type: manual\n    path: docs/child.md\n",
+        )
+        run_generate(git_repo)
+        units = discover(git_repo)
+        excludes = child_scopes(units)
+        parent = next(unit for unit in units if unit.scope_dir == Path("src/pkg"))
+        doc = load_spec(git_repo / parent.spec_path)
+        covered = validate_mod._coverage_files(
+            git_repo,
+            parent.scope_dir,
+            doc,
+            exclude_scopes=excludes[parent.scope_dir],
+        )
+        assert covered == {"src/pkg/__init__.py"}
+        result = run_validate(git_repo)
+        assert result.ok
+
     def test_stage_d_message_is_tsv_safe(self, git_repo: Path, monkeypatch) -> None:
         write_text(
             git_repo / "codoc.yaml",
